@@ -1,9 +1,21 @@
+#pragma once
+
 #include "global.hpp"
 #include <string_view>
 
 #include <atomic>
 #include <string>
 #include <vector>
+
+namespace tsp {
+
+// TSP problem solution
+struct Solution {
+  std::vector<int> path;
+  int              cost;
+};
+
+}    // namespace tsp
 
 namespace util::config {
 

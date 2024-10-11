@@ -2,7 +2,7 @@
 #include <fmt/core.h>
 
 int main(int argc, const char** argv) {
-  auto result = nn::run(DATA_DIR "tsp_10.txt");
+  auto result = nn::run(DATA_DIR "tsp_15_s.txt");
 
   fmt::println("Path: ");
   for (const auto& node : result.path) {

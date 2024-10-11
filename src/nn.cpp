@@ -39,7 +39,7 @@ const std::vector<bool>& used_vertices) noexcept {
 
 void branch(const std::vector<std::vector<int>>& matrix,
             std::vector<bool>                    used,
-            std::vector<Solution>&               solutions,
+            std::vector<tsp::Solution>&          solutions,
             int                                  current_vertex,
             size_t                               branch_number = 0) noexcept {
   used.at(current_vertex) = true;
@@ -92,7 +92,7 @@ void branch(const std::vector<std::vector<int>>& matrix,
 
 namespace nn {
 
-Solution run(std::string_view filename) noexcept {
+tsp::Solution run(std::string_view filename) noexcept {
   const std::vector<std::vector<int>> matrix {
     util::input::tsp_mierzwa(filename)};
 
@@ -107,10 +107,10 @@ Solution run(std::string_view filename) noexcept {
 
   // todo: case with all edges same?
 
-  std::vector<Solution> solutions {};
+  std::vector<tsp::Solution> solutions {};
 
   for (int vertex = 0; vertex < v_count; ++vertex) {
-    solutions.emplace_back(Solution {{vertex}, 0});
+    solutions.emplace_back(tsp::Solution {{vertex}, 0});
 
     std::vector<bool> used_vertices {};
     used_vertices.resize(v_count);
@@ -135,7 +135,7 @@ Solution run(std::string_view filename) noexcept {
   // return one of mininimal cost paths
   return *std::ranges::min_element(
   solutions,
-  [](const Solution& first, const Solution& second) noexcept {
+  [](const tsp::Solution& first, const tsp::Solution& second) noexcept {
     return first.cost < second.cost;
   });
 }
