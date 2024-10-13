@@ -9,6 +9,9 @@
 
 namespace tsp {
 
+template<typename T>
+using Matrix = std::vector<std::vector<T>>;
+
 // TSP problem solution
 struct Solution {
   std::vector<int> path;
@@ -39,7 +42,7 @@ namespace util::output {
 namespace util::input {
 
 // return: cost matrix from mierzwa format tsp
-std::vector<std::vector<int>> tsp_mierzwa(std::string_view filename) noexcept;
+tsp::Matrix<int> tsp_mierzwa(std::string_view filename) noexcept;
 
 }    // namespace util::input
 

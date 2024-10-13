@@ -9,7 +9,7 @@
 namespace util::input {
 
 // return: cost matrix from mierzwa format tsp
-std::vector<std::vector<int>> tsp_mierzwa(std::string_view filename) noexcept {
+tsp::Matrix<int> tsp_mierzwa(std::string_view filename) noexcept {
   size_t vertex_count {0};
 
   std::ifstream file {filename.data()};
@@ -21,7 +21,7 @@ std::vector<std::vector<int>> tsp_mierzwa(std::string_view filename) noexcept {
 
   file >> vertex_count;
 
-  std::vector<std::vector<int>> cost_matrix {};
+  tsp::Matrix<int> cost_matrix {};
   cost_matrix.resize(vertex_count);
 
   for (int i = 0; i < vertex_count; ++i) {

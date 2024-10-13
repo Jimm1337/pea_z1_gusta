@@ -9,6 +9,17 @@
 
 namespace nn::impl {
 
+// Closest node candidates
+struct Candidate {
+  int vertex;
+  int cost;
+};
+
+struct WorkingSolution {
+  tsp::Solution     solution;
+  std::vector<bool> used_vertices;
+};
+
 std::vector<Candidate> find_nearest(
 const std::vector<int>&  costs,
 const std::vector<bool>& used_vertices) noexcept {
@@ -37,27 +48,51 @@ const std::vector<bool>& used_vertices) noexcept {
   return candidates;
 }
 
-void branch(const std::vector<std::vector<int>>& matrix,
-            std::vector<bool>                    used,
-            std::vector<tsp::Solution>&          solutions,
-            int                                  current_vertex,
-            size_t                               branch_number = 0) noexcept {
-  used.at(current_vertex) = true;
+void branch(const tsp::Matrix<int>&       matrix,    // todo
+            std::vector<WorkingSolution>& solutions,
+            tsp::Solution&                current_best,
+            int                           current_vertex,
+            size_t                        branch_number = 0) noexcept {
+  //optimization for paths already worse
+  if (solutions.at(branch_number).solution.cost > current_best.cost) {
+    return;
+  }
 
-  //base case
-  if (std::ranges::all_of(used, [](const auto& elem) {
-        return elem;
-      })) {
+  solutions.at(branch_number).used_vertices.at(current_vertex) = true;
+
+  //base case: all nodes used, add last and quit, check for best
+  if (std::ranges::all_of(solutions.at(branch_number).used_vertices,
+                          [](const auto& elem) {
+                            return elem;
+                          })) {
+    const int first_node = solutions.at(branch_number).solution.path.front();
+    const int last_node  = solutions.at(branch_number).solution.path.back();
+    const int cost_to_return = matrix.at(last_node).at(first_node);
+
+    if (cost_to_return == -1) {    // case no return path from last node
+      solutions.at(branch_number).solution.cost =
+      std::numeric_limits<int>::max();
+      return;
+    }
+
+    solutions.at(branch_number).solution.path.emplace_back(first_node);
+    solutions.at(branch_number).solution.cost += cost_to_return;
+
+    if (solutions.at(branch_number).solution.cost < current_best.cost) {
+      current_best = solutions.at(branch_number).solution;
+    }
+
     return;
   }
 
   std::vector<Candidate> nearest {
-    find_nearest(matrix.at(current_vertex), used)};
+    find_nearest(matrix.at(current_vertex),
+                 solutions.at(branch_number).used_vertices)};
 
   // case: no path
   if (nearest.size() == 0) {
     //trim (no complete path)
-    solutions.at(branch_number).cost = std::numeric_limits<int>::max();
+    solutions.at(branch_number).solution.cost = std::numeric_limits<int>::max();
     return;
   }
 
@@ -65,9 +100,9 @@ void branch(const std::vector<std::vector<int>>& matrix,
   if (nearest.size() >= 1) {
     const Candidate next {nearest.front()};
 
-    solutions.at(branch_number).path.emplace_back(next.vertex);
-    solutions.at(branch_number).cost += next.cost;
-    branch(matrix, used, solutions, next.vertex, branch_number);
+    solutions.at(branch_number).solution.path.emplace_back(next.vertex);
+    solutions.at(branch_number).solution.cost += next.cost;
+    branch(matrix, solutions, current_best, next.vertex, branch_number);
   }
 
   // next closest nodes (if exist) (create new branches)
@@ -80,10 +115,10 @@ void branch(const std::vector<std::vector<int>>& matrix,
 
       const Candidate next {nearest.at(candidate)};
 
-      solutions.at(branch_number).path.emplace_back(next.vertex);
-      solutions.at(branch_number).cost += next.cost;
+      solutions.at(branch_number).solution.path.emplace_back(next.vertex);
+      solutions.at(branch_number).solution.cost += next.cost;
 
-      branch(matrix, used, solutions, next.vertex, branch_number);
+      branch(matrix, solutions, current_best, next.vertex, branch_number);
     }
   }
 }
@@ -93,8 +128,9 @@ void branch(const std::vector<std::vector<int>>& matrix,
 namespace nn {
 
 tsp::Solution run(std::string_view filename) noexcept {
-  const std::vector<std::vector<int>> matrix {
-    util::input::tsp_mierzwa(filename)};
+  const tsp::Matrix<int> matrix {util::input::tsp_mierzwa(filename)};
+
+  static tsp::Solution current_best {{}, std::numeric_limits<int>::max()};
 
   const size_t v_count {matrix.size()};
 
@@ -107,37 +143,25 @@ tsp::Solution run(std::string_view filename) noexcept {
 
   // todo: case with all edges same?
 
-  std::vector<tsp::Solution> solutions {};
+  std::vector<nn::impl::WorkingSolution> solutions {};
 
   for (int vertex = 0; vertex < v_count; ++vertex) {
-    solutions.emplace_back(tsp::Solution {{vertex}, 0});
+    solutions.emplace_back(nn::impl::WorkingSolution {
+      tsp::Solution {{vertex}, 0},
+      {}
+    });
 
-    std::vector<bool> used_vertices {};
-    used_vertices.resize(v_count);
+    solutions.back().used_vertices.resize(v_count);
 
-    impl::branch(matrix,
-                 std::move(used_vertices),
-                 solutions,
-                 vertex,
-                 solutions.size() - 1);
+    impl::branch(matrix, solutions, current_best, vertex, solutions.size() - 1);
   }
 
-  // add return to start
-  for (auto& solution : solutions) {
-    const int first_node     = solution.path.front();
-    const int last_node      = solution.path.back();
-    const int cost_to_return = matrix.at(last_node).at(first_node);
+  const tsp::Solution best {current_best};
 
-    solution.path.emplace_back(first_node);
-    solution.cost += cost_to_return;
-  }
+  //reset for possible next invoke
+  current_best = {{}, std::numeric_limits<int>::max()};
 
-  // return one of mininimal cost paths
-  return *std::ranges::min_element(
-  solutions,
-  [](const tsp::Solution& first, const tsp::Solution& second) noexcept {
-    return first.cost < second.cost;
-  });
+  return best;
 }
 
 }    // namespace nn
