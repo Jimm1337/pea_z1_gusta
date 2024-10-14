@@ -4,7 +4,8 @@
 #include <fmt/core.h>
 #include <string_view>
 
-#include <algorithm>
+#include <cstdint>
+#include <limits>
 #include <queue>
 #include <vector>
 
@@ -17,13 +18,14 @@ struct WorkingSolution {
 
 void algorithm(const tsp::Matrix<int>& matrix,
                tsp::Solution&          current_best,
-               int                     starting_vertex) {
+               int                     starting_vertex) noexcept {
   const size_t v_count = matrix.size();
 
+  // potential paths to be processed
   std::queue<WorkingSolution> queue {};
   queue.push({
     {{starting_vertex}, 0},
-    [&starting_vertex, &v_count] {
+    [&starting_vertex, &v_count]() noexcept {
       std::vector<bool> used {};
       used.resize(v_count, false);
       used.at(starting_vertex) = true;
@@ -31,17 +33,19 @@ void algorithm(const tsp::Matrix<int>& matrix,
     ()
   });
 
-  while (!queue.empty()) {
+  while (!queue.empty()) [[likely]] {
     WorkingSolution current = queue.front();
     queue.pop();
 
     const int current_v    = current.solution.path.back();
     const int current_cost = current.solution.cost;
 
-    if (current.solution.path.size() == v_count) {
+    // if all vertices added check if closed path is better than the best
+    if (current.solution.path.size() == v_count) [[unlikely]] {
       const int return_cost = matrix.at(current_v).at(starting_vertex);
 
-      if (return_cost != -1 && current_cost + return_cost < current_best.cost) {
+      if (return_cost != -1 && current_cost + return_cost < current_best.cost)
+      [[unlikely]] {
         current_best       = current.solution;
         current_best.cost += return_cost;
         current_best.path.emplace_back(starting_vertex);
@@ -49,18 +53,20 @@ void algorithm(const tsp::Matrix<int>& matrix,
       continue;
     }
 
+    // optimization: trim already worse solutions
     if (current_cost >= current_best.cost) {
       continue;
     }
 
+    // explore all adjacent vertices which cost minimal cost to travel to
     std::vector<int> nearest {};
     int              min_cost {std::numeric_limits<int>::max()};
     for (int vertex {0}; vertex < v_count; ++vertex) {
       const bool used = current.used_vertices.at(vertex);
       const int  cost = matrix.at(current_v).at(vertex);
 
-      if (!used && cost != -1 && cost <= min_cost) {
-        if (cost < min_cost) {
+      if (!used && cost != -1 && cost <= min_cost) [[unlikely]] {
+        if (cost < min_cost) [[unlikely]] {
           nearest.clear();
           min_cost = cost;
         }
@@ -68,8 +74,9 @@ void algorithm(const tsp::Matrix<int>& matrix,
       }
     }
 
+    // add next paths to be processed for nearest neighbour
     for (const auto& option : nearest) {
-      queue.push([&current, &option, &min_cost] {
+      queue.push([&current, &option, &min_cost]() noexcept {
         WorkingSolution next_itr {current};
         next_itr.solution.path.emplace_back(option);
         next_itr.solution.cost            += min_cost;
@@ -89,10 +96,10 @@ tsp::Solution run(std::string_view filename) noexcept {
 
   const size_t v_count {matrix.size()};
 
-  if (v_count == 0) {    //error: bad input
+  if (v_count == 0) [[unlikely]] {    //error: bad input
     fmt::println("[E] Invalid input");
     return {};
-  } else if (v_count == 1) {    //edge case: 1 vertex
+  } else if (v_count == 1) [[unlikely]] {    //edge case: 1 vertex
     return {{{0}}, 0};
   }
 

@@ -1,9 +1,9 @@
 #pragma once
 
-#include "global.hpp"
 #include <string_view>
 
 #include <atomic>
+#include <cstdint>
 #include <string>
 #include <vector>
 
