@@ -1,14 +1,17 @@
-#include "nn.hpp"
+#include "bf.hpp"
 
-#include "util.hpp"
 #include <fmt/core.h>
-#include <string_view>
 
 #include <algorithm>
 #include <queue>
 #include <vector>
 
-namespace nn::impl {
+namespace bf::impl {
+
+struct Candidate {
+  int vertex;
+  int cost;
+};
 
 struct WorkingSolution {
   tsp::Solution     solution;
@@ -53,36 +56,31 @@ void algorithm(const tsp::Matrix<int>& matrix,
       continue;
     }
 
-    std::vector<int> nearest {};
-    int              min_cost {std::numeric_limits<int>::max()};
+    std::vector<Candidate> options {};
     for (int vertex {0}; vertex < v_count; ++vertex) {
       const bool used = current.used_vertices.at(vertex);
       const int  cost = matrix.at(current_v).at(vertex);
 
-      if (!used && cost != -1 && cost <= min_cost) {
-        if (cost < min_cost) {
-          nearest.clear();
-          min_cost = cost;
-        }
-        nearest.emplace_back(vertex);
+      if (!used && cost != -1) {
+        options.emplace_back(Candidate {vertex, cost});
       }
     }
 
-    for (const auto& option : nearest) {
-      queue.push([&current, &option, &min_cost] {
+    for (const auto& option : options) {
+      queue.push([&current, &option] {
         WorkingSolution next_itr {current};
-        next_itr.solution.path.emplace_back(option);
-        next_itr.solution.cost            += min_cost;
-        next_itr.used_vertices.at(option)  = true;
+        next_itr.solution.path.emplace_back(option.vertex);
+        next_itr.solution.cost                   += option.cost;
+        next_itr.used_vertices.at(option.vertex)  = true;
         return next_itr;
       }());
     }
   }
 }
 
-}    // namespace nn::impl
+}    // namespace bf::impl
 
-namespace nn {
+namespace bf {
 
 tsp::Solution run(std::string_view filename) noexcept {
   const tsp::Matrix<int> matrix {util::input::tsp_mierzwa(filename)};
@@ -105,4 +103,4 @@ tsp::Solution run(std::string_view filename) noexcept {
   return best;
 }
 
-}    // namespace nn
+}    // namespace bf
