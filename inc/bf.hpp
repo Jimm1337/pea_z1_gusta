@@ -5,6 +5,7 @@
 
 namespace bf {
 
-tsp::Solution run(std::string_view filename) noexcept;
+std::variant<tsp::Solution, tsp::ErrorAlgorithm> run(
+const tsp::Matrix<int>& matrix) noexcept;
 
 }    // namespace bf

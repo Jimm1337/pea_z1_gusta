@@ -91,22 +91,22 @@ void algorithm(const tsp::Matrix<int>& matrix,
 
 namespace bf {
 
-tsp::Solution run(std::string_view filename) noexcept {
-  const tsp::Matrix<int> matrix {util::input::tsp_mierzwa(filename)};
-
+std::variant<tsp::Solution, tsp::ErrorAlgorithm> run(
+const tsp::Matrix<int>& matrix) noexcept {
   const size_t v_count {matrix.size()};
 
-  if (v_count == 0) [[unlikely]] {    //error: bad input
-    fmt::println("[E] Invalid input");
-    return {};
-  } else if (v_count == 1) [[unlikely]] {    //edge case: 1 vertex
-    return {{{0}}, 0};
+  if (v_count == 1) [[unlikely]] {    //edge case: 1 vertex
+    return tsp::Solution {{{0}}, 0};
   }
 
   tsp::Solution best {{}, std::numeric_limits<int>::max()};
 
   for (int vertex {0}; vertex < v_count; ++vertex) {
     impl::algorithm(matrix, best, vertex);
+  }
+
+  if (best.cost == std::numeric_limits<int>::max()) {
+    return tsp::ErrorAlgorithm::NO_PATH;
   }
 
   return best;

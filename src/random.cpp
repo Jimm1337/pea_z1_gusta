@@ -21,6 +21,8 @@ struct RandomSource {
   std::uniform_int_distribution<int> dist;
 };
 
+constexpr static int NUMBER_OF_RETRIES {1000};
+
 void algorithm(const tsp::Matrix<int>& matrix,
                RandomSource&           random_source,
                tsp::Solution&          current_best) noexcept {
@@ -54,7 +56,7 @@ void algorithm(const tsp::Matrix<int>& matrix,
     }
 
     // while did not rand valid vertex generate, then add valid random vertex
-    while (true) {
+    for (int i {0}; i < NUMBER_OF_RETRIES; ++i) {
       const int  random_v {random_source.dist(random_source.engine)};
       const bool used {work.used_vertices.at(random_v)};
       const int  cost {matrix.at(work.solution.path.back()).at(random_v)};
@@ -89,16 +91,17 @@ void algorithm(const tsp::Matrix<int>& matrix,
 
 namespace random {
 
-tsp::Solution run(std::string_view filename, size_t itr) noexcept {
-  const tsp::Matrix<int> matrix {util::input::tsp_mierzwa(filename)};
+std::variant<tsp::Solution, tsp::ErrorAlgorithm> run(
+const tsp::Matrix<int>& matrix,
+int                     itr) noexcept {
+  if (itr < 1) {
+    return tsp::ErrorAlgorithm::INVALID_PARAM;
+  }
 
   const size_t v_count {matrix.size()};
 
-  if (v_count == 0) [[unlikely]] {    //error: bad input
-    fmt::println("[E] Invalid input");
-    return {};
-  } else if (v_count == 1) [[unlikely]] {    //edge case: 1 vertex
-    return {{{0}}, 0};
+  if (v_count == 1) [[unlikely]] {    //edge case: 1 vertex
+    return tsp::Solution {{{0}}, 0};
   }
 
   std::random_device device {};
@@ -111,6 +114,10 @@ tsp::Solution run(std::string_view filename, size_t itr) noexcept {
 
   for (int iteration {0}; iteration < itr; ++iteration) {
     impl::algorithm(matrix, random_source, best);
+  }
+
+  if (best.cost == std::numeric_limits<int>::max()) {
+    return tsp::ErrorAlgorithm::NO_PATH;
   }
 
   return best;

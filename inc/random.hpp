@@ -7,6 +7,8 @@
 
 namespace random {
 
-tsp::Solution run(std::string_view filename, size_t itr) noexcept;
+std::variant<tsp::Solution, tsp::ErrorAlgorithm> run(
+const tsp::Matrix<int>& matrix,
+int                     itr) noexcept;
 
 }    // namespace random

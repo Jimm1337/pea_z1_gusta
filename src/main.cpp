@@ -1,47 +1,38 @@
 #include "bf.hpp"
 #include "nn.hpp"
 #include "random.hpp"
+#include "util.hpp"
 #include <fmt/core.h>
 
 int main(int argc, const char** argv) {
-  auto result_nn = nn::run(DATA_DIR "test_6_as.txt");
-  fmt::print(".");
-  auto result_bf = bf::run(DATA_DIR "test_6_as.txt");
-  fmt::print(".");
-  auto result_random = random::run(DATA_DIR "test_6_as.txt", 1000);
-  fmt::println(".\n");
-
-  if (result_nn.path.size() == 0) {
+  const auto arg_result {util::arg::read(argc, argv)};
+  if (util::error::handle(arg_result) == tsp::State::ERROR) {
     return EXIT_FAILURE;
   }
+  const tsp::Arguments arg {std::get<tsp::Arguments>(arg_result)};
 
-  if (result_bf.path.size() == 0) {
+  const auto config_result {util::config::read(arg.config_path)};
+  if (util::error::handle(config_result) == tsp::State::ERROR) {
     return EXIT_FAILURE;
   }
+  const tsp::Instance config {std::get<tsp::Instance>(config_result)};
 
-  fmt::println("NN Path: ");
-  for (const auto& node : result_nn.path) {
-    fmt::print("{} ", node);
+  const auto timed_result {[&arg, &config]() noexcept {
+    switch (arg.algorithm) {
+      case tsp::Algorithm::BRUTE_FORCE:
+        return util::measured_run(bf::run, config.matrix);
+      case tsp::Algorithm::NEAREST_NEIGHBOUR:
+        return util::measured_run(nn::run, config.matrix);
+      case tsp::Algorithm::RANDOM:
+        return util::measured_run(random::run, config.matrix, config.param);
+      default:
+        std::terminate();
+    }
+  }()};
+  if (util::error::handle(timed_result) == tsp::State::ERROR) {
+    return EXIT_FAILURE;
   }
-  fmt::println("\n");
+  const tsp::Result timed {std::get<tsp::Result>(timed_result)};
 
-  fmt::println("Cost: {}\n", result_nn.cost);
-
-  fmt::println("BF Path: ");
-  for (const auto& node : result_bf.path) {
-    fmt::print("{} ", node);
-  }
-  fmt::println("\n");
-
-  fmt::println("Cost: {}\n", result_bf.cost);
-
-  fmt::println("Random Path: ");
-  for (const auto& node : result_random.path) {
-    fmt::print("{} ", node);
-  }
-  fmt::println("\n");
-
-  fmt::println("Cost: {}\n", result_random.cost);
-
-  return EXIT_SUCCESS;
+  util::output::report(arg, config, timed);
 }

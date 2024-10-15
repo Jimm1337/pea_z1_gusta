@@ -1,10 +1,15 @@
 #pragma once
 
+#include <fmt/core.h>
 #include <string_view>
+#include <type_traits>
 
 #include <atomic>
+#include <chrono>
+#include <concepts>
 #include <cstdint>
 #include <string>
+#include <variant>
 #include <vector>
 
 namespace tsp {
@@ -12,49 +17,219 @@ namespace tsp {
 template<typename T>
 using Matrix = std::vector<std::vector<T>>;
 
-// TSP problem solution
+using Time = std::chrono::duration<double, std::milli>;
+
+enum class State : uint_fast8_t {
+  OK,
+  ERROR,
+};
+
+enum class Algorithm : uint_fast8_t {
+  BRUTE_FORCE,
+  NEAREST_NEIGHBOUR,
+  RANDOM,
+  INVALID,
+};
+
+enum class ErrorConfig : uint_fast8_t {
+  BAD_READ,
+  BAD_CONFIG,
+  CAN_NOT_PROCEED,
+};
+
+enum class ErrorAlgorithm : uint_fast8_t {
+  NO_PATH,
+  INVALID_PARAM,
+};
+
+enum class ErrorArg : uint_fast8_t {
+  NO_ARG,
+  MULTIPLE_ARG,
+  BAD_ARG,
+};
+
+enum class ErrorRead : uint_fast8_t {
+  BAD_READ,
+  BAD_DATA,
+};
+
+struct Arguments {
+  tsp::Algorithm algorithm;
+  std::string    config_path;
+};
+
 struct Solution {
   std::vector<int> path;
   int              cost;
+};
+
+struct Instance {
+  tsp::Matrix<int> matrix;
+  std::string      config_filename;
+  std::string      input_filename;
+  tsp::Solution    optimal;
+  int              param;
+};
+
+struct Result {
+  tsp::Solution solution;
+  tsp::Time     time;
+};
+
+struct Duration {
+  double      count;
+  std::string unit;
 };
 
 }    // namespace tsp
 
 namespace util::config {
 
-struct Inputs {
-  std::vector<std::string> filenames;
-  std::vector<int32_t>     optimal_path_costs;
-};
+std::variant<tsp::Instance, tsp::ErrorConfig> read(
+std::string_view filename) noexcept;
 
-struct Data {
-  Inputs                   inputs;
-  std::vector<std::string> output_filenames;
-  //todo: stop cond
-};
+void help_page() noexcept;
 
 }    // namespace util::config
 
 namespace util::output {
 
+void report(const tsp::Arguments& arguments,
+            const tsp::Instance&  instance,
+            const tsp::Result&    result) noexcept;
+
 }    // namespace util::output
 
 namespace util::input {
 
-// return: cost matrix from mierzwa format tsp
-tsp::Matrix<int> tsp_mierzwa(std::string_view filename) noexcept;
+std::variant<tsp::Matrix<int>, tsp::ErrorRead> tsp_matrix(
+std::string_view filename) noexcept;
+
+void help_page() noexcept;
 
 }    // namespace util::input
 
 namespace util::arg {
 
-bool has_string(int argc, const char** argv, std::string_view str) noexcept;
+std::variant<tsp::Arguments, tsp::ErrorArg> read(int          argc,
+                                                 const char** argv) noexcept;
+
+void help_page() noexcept;
 
 }    // namespace util::arg
 
-namespace util::display {
+namespace util::error {
 
-void busy_dots(std::atomic_bool& stop_token) noexcept;
-void config(const config::Data& config) noexcept;
+template<typename Ret, typename Error>
+requires std::same_as<std::remove_cvref_t<Error>, tsp::ErrorAlgorithm> ||
+         std::same_as<std::remove_cvref_t<Error>, tsp::ErrorArg> ||
+         std::same_as<std::remove_cvref_t<Error>, tsp::ErrorConfig> ||
+         std::same_as<std::remove_cvref_t<Error>, tsp::ErrorRead>
+tsp::State handle(const std::variant<Ret, Error>& result) noexcept {
+  using Err = std::remove_cvref_t<Error>;
 
-}    // namespace util::display
+  if constexpr (std::is_same_v<Err, tsp::ErrorAlgorithm>) {
+    if (std::holds_alternative<Error>(result)) [[unlikely]] {
+      fmt::print("[E] Algorithm Error: ");
+
+      switch (std::get<1>(result)) {
+        case tsp::ErrorAlgorithm::NO_PATH:
+          fmt::println("No complete path found!");
+          return tsp::State::ERROR;
+        case tsp::ErrorAlgorithm::INVALID_PARAM:
+          fmt::println("Invalid parameter specified!");
+          return tsp::State::ERROR;
+      }
+    }
+  }
+
+  if constexpr (std::is_same_v<Err, tsp::ErrorArg>) {
+    if (std::holds_alternative<Error>(result)) [[unlikely]] {
+      fmt::print("[E] Argument error: ");
+
+      switch (std::get<1>(result)) {
+        case tsp::ErrorArg::NO_ARG:
+          fmt::println("No arguments.\n");
+          arg::help_page();
+          return tsp::State::ERROR;
+
+        case tsp::ErrorArg::MULTIPLE_ARG:
+          fmt::println("Multiple arguments.\n");
+          arg::help_page();
+          return tsp::State::ERROR;
+
+        case tsp::ErrorArg::BAD_ARG:
+          fmt::println("Invalid arguments.\n");
+          arg::help_page();
+          return tsp::State::ERROR;
+      }
+    }
+  }
+
+  if constexpr (std::is_same_v<Err, tsp::ErrorConfig>) {
+    if (std::holds_alternative<Error>(result)) [[unlikely]] {
+      fmt::print("[E] Config Error: ");
+
+      switch (std::get<1>(result)) {
+        case tsp::ErrorConfig::BAD_READ:
+          fmt::println("Could not read config file at specified path!");
+          return tsp::State::ERROR;
+
+        case tsp::ErrorConfig::BAD_CONFIG:
+          fmt::println("Invalid format!\n");
+          config::help_page();
+          return tsp::State::ERROR;
+
+        case tsp::ErrorConfig::CAN_NOT_PROCEED:
+          fmt::println("Can not proceed due to previous errors.");
+          return tsp::State::ERROR;
+      }
+    }
+  }
+
+  if constexpr (std::is_same_v<Err, tsp::ErrorRead>) {
+    if (std::holds_alternative<Error>(result)) [[unlikely]] {
+      fmt::print("[E] Input Error: ");
+
+      switch (std::get<1>(result)) {
+        case tsp::ErrorRead::BAD_READ:
+          fmt::println("Could not read input file specified in config!");
+          return tsp::State::ERROR;
+
+        case tsp::ErrorRead::BAD_DATA:
+          fmt::println("Wrong format of data!\n");
+          input::help_page();
+          return tsp::State::ERROR;
+      }
+    }
+  }
+
+  return tsp::State::OK;
+}
+
+}    // namespace util::error
+
+namespace util {
+
+template<typename Func, typename... AditionalParams>
+requires std::invocable<Func, const tsp::Matrix<int>&, AditionalParams...>
+std::variant<tsp::Result, tsp::ErrorAlgorithm> measured_run(
+Func                    algorithm,
+const tsp::Matrix<int>& input,
+AditionalParams... params) noexcept {
+  const auto start {std::chrono::high_resolution_clock::now()};
+
+  const std::variant<tsp::Solution, tsp::ErrorAlgorithm> solution {
+    algorithm(input, std::forward<AditionalParams>(params)...)};
+
+  const auto end {std::chrono::high_resolution_clock::now()};
+
+  if (std::holds_alternative<tsp::ErrorAlgorithm>(solution)) [[unlikely]] {
+    return std::get<tsp::ErrorAlgorithm>(solution);
+  }
+
+  return tsp::Result {std::get<tsp::Solution>(solution),
+                      tsp::Time {end - start}};
+}
+
+}    // namespace util
