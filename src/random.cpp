@@ -21,7 +21,7 @@ struct RandomSource {
   std::uniform_int_distribution<int> dist;
 };
 
-constexpr static int NUMBER_OF_RETRIES {1000};
+constexpr static int NUMBER_OF_RETRIES {1'0000};
 
 void algorithm(const tsp::Matrix<int>& matrix,
                RandomSource&           random_source,
@@ -37,6 +37,8 @@ void algorithm(const tsp::Matrix<int>& matrix,
   work.used_vertices.at(work.solution.path.front()) = true;
 
   while (work.solution.path.size() != v_count) [[likely]] {
+    const size_t starting_size {work.solution.path.size()};
+
     // optimization: trim already worse path
     if (work.solution.cost >= current_best.cost) {
       return;
@@ -68,6 +70,11 @@ void algorithm(const tsp::Matrix<int>& matrix,
         break;
       }
     }
+
+    // no path found in max retries
+    if (starting_size == work.solution.path.size()) [[unlikely]] {
+      return;
+    }
   }
 
   // edge case: no path from last to beggining
@@ -91,7 +98,7 @@ void algorithm(const tsp::Matrix<int>& matrix,
 
 namespace random {
 
-std::variant<tsp::Solution, tsp::ErrorAlgorithm> run(
+[[nodiscard]] std::variant<tsp::Solution, tsp::ErrorAlgorithm> run(
 const tsp::Matrix<int>& matrix,
 int                     itr) noexcept {
   if (itr < 1) {
@@ -116,7 +123,7 @@ int                     itr) noexcept {
     impl::algorithm(matrix, random_source, best);
   }
 
-  if (best.cost == std::numeric_limits<int>::max()) {
+  if (best.cost == std::numeric_limits<int>::max()) [[unlikely]] {
     return tsp::ErrorAlgorithm::NO_PATH;
   }
 

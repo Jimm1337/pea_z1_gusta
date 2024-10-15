@@ -85,7 +85,7 @@ struct Duration {
 
 namespace util::config {
 
-std::variant<tsp::Instance, tsp::ErrorConfig> read(
+[[nodiscard]] std::variant<tsp::Instance, tsp::ErrorConfig> read(
 std::string_view filename) noexcept;
 
 void help_page() noexcept;
@@ -102,7 +102,7 @@ void report(const tsp::Arguments& arguments,
 
 namespace util::input {
 
-std::variant<tsp::Matrix<int>, tsp::ErrorRead> tsp_matrix(
+[[nodiscard]] std::variant<tsp::Matrix<int>, tsp::ErrorRead> tsp_matrix(
 std::string_view filename) noexcept;
 
 void help_page() noexcept;
@@ -111,8 +111,9 @@ void help_page() noexcept;
 
 namespace util::arg {
 
-std::variant<tsp::Arguments, tsp::ErrorArg> read(int          argc,
-                                                 const char** argv) noexcept;
+[[nodiscard]] std::variant<tsp::Arguments, tsp::ErrorArg> read(
+int          argc,
+const char** argv) noexcept;
 
 void help_page() noexcept;
 
@@ -213,7 +214,7 @@ namespace util {
 
 template<typename Func, typename... AditionalParams>
 requires std::invocable<Func, const tsp::Matrix<int>&, AditionalParams...>
-std::variant<tsp::Result, tsp::ErrorAlgorithm> measured_run(
+[[nodiscard]] std::variant<tsp::Result, tsp::ErrorAlgorithm> measured_run(
 Func                    algorithm,
 const tsp::Matrix<int>& input,
 AditionalParams... params) noexcept {

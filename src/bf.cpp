@@ -91,7 +91,7 @@ void algorithm(const tsp::Matrix<int>& matrix,
 
 namespace bf {
 
-std::variant<tsp::Solution, tsp::ErrorAlgorithm> run(
+[[nodiscard]] std::variant<tsp::Solution, tsp::ErrorAlgorithm> run(
 const tsp::Matrix<int>& matrix) noexcept {
   const size_t v_count {matrix.size()};
 
@@ -105,7 +105,7 @@ const tsp::Matrix<int>& matrix) noexcept {
     impl::algorithm(matrix, best, vertex);
   }
 
-  if (best.cost == std::numeric_limits<int>::max()) {
+  if (best.cost == std::numeric_limits<int>::max()) [[unlikely]] {
     return tsp::ErrorAlgorithm::NO_PATH;
   }
 

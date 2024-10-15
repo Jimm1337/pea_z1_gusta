@@ -28,7 +28,7 @@ void help_page() noexcept {
   "cost = 150");
 }
 
-std::variant<tsp::Instance, tsp::ErrorConfig> read(
+[[nodiscard]] std::variant<tsp::Instance, tsp::ErrorConfig> read(
 std::string_view filename) noexcept {
   // const auto filename = "C:/dev/pea_z1_gusta/configs/instance_6.ini";
 
@@ -56,7 +56,7 @@ std::string_view filename) noexcept {
         std::vector<int> path {};
 
         int extracted {-1};
-        while (stream >> extracted) {
+        while (stream >> extracted) [[likely]] {
           if (stream.fail()) {
             return std::vector<int> {-1};
           }
@@ -67,7 +67,7 @@ std::string_view filename) noexcept {
         return path;
       }()};
   if (!optimal_solution_path_parsed.empty() &&
-      optimal_solution_path_parsed.at(0) == -1) {
+      optimal_solution_path_parsed.at(0) == -1) [[unlikely]] {
     return tsp::ErrorConfig::BAD_CONFIG;
   }
 
@@ -75,7 +75,7 @@ std::string_view filename) noexcept {
     reader.GetInteger("optimal", "cost", std::numeric_limits<long>::max())};
 
   const auto matrix_result {input::tsp_matrix(input_path)};
-  if (error::handle(matrix_result) == tsp::State::ERROR) {
+  if (error::handle(matrix_result) == tsp::State::ERROR) [[unlikely]] {
     return tsp::ErrorConfig::CAN_NOT_PROCEED;
   }
   const tsp::Matrix<int> matrix {std::get<tsp::Matrix<int>>(matrix_result)};
@@ -93,7 +93,7 @@ std::string_view filename) noexcept {
 
 namespace util::output {
 
-tsp::Duration parse_duration(const tsp::Time& duration) noexcept {
+[[nodiscard]] tsp::Duration parse_duration(const tsp::Time& duration) noexcept {
   if (duration.count() < 0.001) {    // nanoseconds
     return {duration.count() * 1000 * 1000, "ns"};
   }
@@ -193,23 +193,23 @@ void help_page() noexcept {
 }
 
 // return: cost matrix from mierzwa format tsp
-std::variant<tsp::Matrix<int>, tsp::ErrorRead> tsp_matrix(
+[[nodiscard]] std::variant<tsp::Matrix<int>, tsp::ErrorRead> tsp_matrix(
 std::string_view filename) noexcept {
   size_t vertex_count {0};
 
   std::ifstream file {filename.data()};
 
-  if (file.fail()) {
+  if (file.fail()) [[unlikely]] {
     return tsp::ErrorRead::BAD_READ;
   }
 
   file >> vertex_count;
 
-  if (file.eof()) {
+  if (file.eof()) [[unlikely]] {
     return tsp::ErrorRead::BAD_DATA;
   }
 
-  if (vertex_count == 0) {
+  if (vertex_count == 0) [[unlikely]] {
     return tsp::ErrorRead::BAD_DATA;
   }
 
@@ -223,7 +223,7 @@ std::string_view filename) noexcept {
       int cost_read {-2};
       file >> cost_read;
 
-      if (file.eof()) {
+      if (file.eof()) [[unlikely]] {
         return tsp::ErrorRead::BAD_DATA;
       }
 
@@ -250,9 +250,10 @@ void help_page() noexcept {
   "pea_z1_gusta --config=C:/dev/pea_z1_gusta/configs/test_6.ini -r");
 }
 
-std::variant<tsp::Arguments, tsp::ErrorArg> read(int          argc,
-                                                 const char** argv) noexcept {
-  if (argc <= 1) {
+[[nodiscard]] std::variant<tsp::Arguments, tsp::ErrorArg> read(
+int          argc,
+const char** argv) noexcept {
+  if (argc <= 1) [[unlikely]] {
     return tsp::ErrorArg::NO_ARG;
   }
 
@@ -278,13 +279,13 @@ std::variant<tsp::Arguments, tsp::ErrorArg> read(int          argc,
       return false;
     })};
 
-    if (itr == arg_vec.end()) {
+    if (itr == arg_vec.end()) [[unlikely]] {
       return std::string {""};
     }
 
     return itr->substr(9);
   }()};
-  if (config_path == "") {
+  if (config_path == "") [[unlikely]] {
     return tsp::ErrorArg::BAD_ARG;
   }
 
@@ -301,9 +302,9 @@ std::variant<tsp::Arguments, tsp::ErrorArg> read(int          argc,
     }
     return count;
   }()};
-  if (algo_count > 1) {
+  if (algo_count > 1) [[unlikely]] {
     return tsp::ErrorArg::MULTIPLE_ARG;
-  } else if (algo_count == 0) {
+  } else if (algo_count == 0) [[unlikely]] {
     return tsp::ErrorArg::NO_ARG;
   }
 
