@@ -74,6 +74,10 @@ std::string_view filename) noexcept {
           path.emplace_back(extracted);
         }
 
+        if (path.size() != matrix.size()) [[unlikely]] {
+          return std::vector<int> {-1};
+        }
+
         return path;
       }()};
   if (!optimal_solution_path_parsed.empty() &&
