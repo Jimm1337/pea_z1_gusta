@@ -43,6 +43,12 @@ std::string_view filename) noexcept {
     return tsp::ErrorConfig::BAD_CONFIG;
   }
 
+  const auto matrix_result {input::tsp_matrix(input_path)};
+  if (error::handle(matrix_result) == tsp::State::ERROR) [[unlikely]] {
+    return tsp::ErrorConfig::CAN_NOT_PROCEED;
+  }
+  const tsp::Matrix<int> matrix {std::get<tsp::Matrix<int>>(matrix_result)};
+
   const long algorithm_parameter {
     reader.GetInteger("instance", "algorithm_parameter", -1)};
 
@@ -50,14 +56,18 @@ std::string_view filename) noexcept {
   const std::vector<int> optimal_solution_path_parsed {
     optimal_solution_path == ""
     ? std::vector<int> {}
-    : [&optimal_solution_path]() noexcept {
+    : [&optimal_solution_path, &matrix]() noexcept {
         std::stringstream stream {optimal_solution_path};
 
         std::vector<int> path {};
 
         int extracted {-1};
         while (stream >> extracted) [[likely]] {
-          if (stream.fail()) {
+          if (stream.fail()) [[unlikely]] {
+            return std::vector<int> {-1};
+          }
+
+          if (extracted < 0 || extracted >= matrix.size()) [[unlikely]] {
             return std::vector<int> {-1};
           }
 
@@ -73,12 +83,6 @@ std::string_view filename) noexcept {
 
   const long optimal_solution_cost {
     reader.GetInteger("optimal", "cost", std::numeric_limits<long>::max())};
-
-  const auto matrix_result {input::tsp_matrix(input_path)};
-  if (error::handle(matrix_result) == tsp::State::ERROR) [[unlikely]] {
-    return tsp::ErrorConfig::CAN_NOT_PROCEED;
-  }
-  const tsp::Matrix<int> matrix {std::get<tsp::Matrix<int>>(matrix_result)};
 
   return tsp::Instance {
     matrix,
