@@ -1,10 +1,7 @@
 #include "bf.hpp"
 
 #include "util.hpp"
-#include <fmt/core.h>
-#include <string_view>
 
-#include <algorithm>
 #include <limits>
 #include <queue>
 #include <vector>
@@ -21,20 +18,20 @@ struct WorkingSolution {
   std::vector<bool> used_vertices;
 };
 
-void algorithm(const tsp::Matrix<int>& matrix,
-               tsp::Solution&          current_best,
-               int                     starting_vertex) noexcept {
-  const size_t v_count = matrix.size();
+static void algorithm(const tsp::Matrix<int>& matrix,
+                      tsp::Solution&          current_best,
+                      int                     starting_vertex) noexcept {
+  const size_t v_count {matrix.size()};
 
   // potential paths to be processed
   std::queue<WorkingSolution> queue {};
   queue.push({
-    {{starting_vertex}, 0},
+    {.path = {starting_vertex}, .cost = 0},
     [&starting_vertex, &v_count]() noexcept {
       std::vector<bool> used {};
       used.resize(v_count, false);
       used.at(starting_vertex) = true;
-      return used;                  }
+      return used;                                  }
     ()
   });
 
@@ -42,19 +39,19 @@ void algorithm(const tsp::Matrix<int>& matrix,
     WorkingSolution current = queue.front();
     queue.pop();
 
-    const int current_v    = current.solution.path.back();
-    const int current_cost = current.solution.cost;
+    const int current_v {current.solution.path.back()};
+    const int current_cost {current.solution.cost};
 
     // if all vertices added check if closed path is better than the best
     if (current.solution.path.size() == v_count) [[unlikely]] {
-      const int return_cost = matrix.at(current_v).at(starting_vertex);
-
-      if (return_cost != -1 && current_cost + return_cost < current_best.cost)
+      if (const int return_cost {matrix.at(current_v).at(starting_vertex)};
+          return_cost != -1 && current_cost + return_cost < current_best.cost)
       [[unlikely]] {
         current_best       = current.solution;
         current_best.cost += return_cost;
         current_best.path.emplace_back(starting_vertex);
       }
+
       continue;
     }
 
@@ -66,11 +63,11 @@ void algorithm(const tsp::Matrix<int>& matrix,
     // explore all valid options (not used in current path)
     std::vector<Candidate> options {};
     for (int vertex {0}; vertex < v_count; ++vertex) {
-      const bool used = current.used_vertices.at(vertex);
-      const int  cost = matrix.at(current_v).at(vertex);
+      const bool used {current.used_vertices.at(vertex)};
 
-      if (!used && cost != -1) [[likely]] {
-        options.emplace_back(Candidate {vertex, cost});
+      if (const int cost {matrix.at(current_v).at(vertex)}; !used && cost != -1)
+      [[likely]] {
+        options.emplace_back(Candidate {.vertex = vertex, .cost = cost});
       }
     }
 
@@ -96,10 +93,10 @@ const tsp::Matrix<int>& matrix) noexcept {
   const size_t v_count {matrix.size()};
 
   if (v_count == 1) [[unlikely]] {    //edge case: 1 vertex
-    return tsp::Solution {{{0}}, 0};
+    return tsp::Solution {.path = {{0}}, .cost = 0};
   }
 
-  tsp::Solution best {{}, std::numeric_limits<int>::max()};
+  tsp::Solution best {.path = {}, .cost = std::numeric_limits<int>::max()};
 
   for (int vertex {0}; vertex < v_count; ++vertex) {
     impl::algorithm(matrix, best, vertex);

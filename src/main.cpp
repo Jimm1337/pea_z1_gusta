@@ -2,7 +2,10 @@
 #include "nn.hpp"
 #include "random.hpp"
 #include "util.hpp"
-#include <fmt/core.h>
+
+#include <windows.h>
+
+#pragma comment(lib, "Kernel32.lib")
 
 int main(int argc, const char** argv) {
   const auto arg_result {util::arg::read(argc, argv)};
@@ -11,11 +14,17 @@ int main(int argc, const char** argv) {
   }
   const tsp::Arguments arg {std::get<tsp::Arguments>(arg_result)};
 
-  const auto config_result {util::config::read(arg.config_path)};
+  const auto config_result {util::config::read(arg.config_file)};
   if (util::error::handle(config_result) == tsp::State::ERROR) {
     return EXIT_FAILURE;
   }
   const tsp::Instance config {std::get<tsp::Instance>(config_result)};
+
+  if (SetPriorityClass(GetCurrentProcess(), HIGH_PRIORITY_CLASS) == 0 ||
+      SetThreadPriority(GetCurrentThread(), THREAD_PRIORITY_HIGHEST) == 0) {
+    fmt::println(
+    "[W] Could not set task priority to HIGH. Timing may be inconsistent.");
+  }
 
   const auto timed_result {[&arg, &config]() noexcept {
     switch (arg.algorithm) {
@@ -35,4 +44,6 @@ int main(int argc, const char** argv) {
   const tsp::Result timed {std::get<tsp::Result>(timed_result)};
 
   util::output::report(arg, config, timed);
+
+  return EXIT_SUCCESS;
 }

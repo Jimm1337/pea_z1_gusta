@@ -1,13 +1,13 @@
 #pragma once
 
 #include <fmt/core.h>
-#include <string_view>
 #include <type_traits>
 
-#include <atomic>
 #include <chrono>
 #include <concepts>
 #include <cstdint>
+#include <filesystem>
+#include <ratio>
 #include <string>
 #include <variant>
 #include <vector>
@@ -54,8 +54,8 @@ enum class ErrorRead : uint_fast8_t {
 };
 
 struct Arguments {
-  tsp::Algorithm algorithm;
-  std::string    config_path;
+  Algorithm             algorithm;
+  std::filesystem::path config_file;
 };
 
 struct Solution {
@@ -64,16 +64,16 @@ struct Solution {
 };
 
 struct Instance {
-  tsp::Matrix<int> matrix;
-  std::string      config_filename;
-  std::string      input_filename;
-  tsp::Solution    optimal;
-  int              param;
+  Matrix<int>           matrix;
+  std::filesystem::path config_file;
+  std::filesystem::path input_file;
+  Solution              optimal;
+  int                   param;
 };
 
 struct Result {
-  tsp::Solution solution;
-  tsp::Time     time;
+  Solution solution;
+  Time     time;
 };
 
 struct Duration {
@@ -86,7 +86,7 @@ struct Duration {
 namespace util::config {
 
 [[nodiscard]] std::variant<tsp::Instance, tsp::ErrorConfig> read(
-std::string_view filename) noexcept;
+const std::filesystem::path& config_file) noexcept;
 
 void help_page() noexcept;
 
@@ -103,7 +103,7 @@ void report(const tsp::Arguments& arguments,
 namespace util::input {
 
 [[nodiscard]] std::variant<tsp::Matrix<int>, tsp::ErrorRead> tsp_matrix(
-std::string_view filename) noexcept;
+const std::filesystem::path& input_file) noexcept;
 
 void help_page() noexcept;
 
@@ -137,8 +137,13 @@ tsp::State handle(const std::variant<Ret, Error>& result) noexcept {
         case tsp::ErrorAlgorithm::NO_PATH:
           fmt::println("No complete path found!");
           return tsp::State::ERROR;
+
         case tsp::ErrorAlgorithm::INVALID_PARAM:
           fmt::println("Invalid parameter specified!");
+          return tsp::State::ERROR;
+
+        default:
+          fmt::println("Something went wrong!");
           return tsp::State::ERROR;
       }
     }
@@ -163,6 +168,10 @@ tsp::State handle(const std::variant<Ret, Error>& result) noexcept {
           fmt::println("Invalid arguments.\n");
           arg::help_page();
           return tsp::State::ERROR;
+
+        default:
+          fmt::println("Something went wrong!");
+          return tsp::State::ERROR;
       }
     }
   }
@@ -184,6 +193,10 @@ tsp::State handle(const std::variant<Ret, Error>& result) noexcept {
         case tsp::ErrorConfig::CAN_NOT_PROCEED:
           fmt::println("Can not proceed due to previous errors.");
           return tsp::State::ERROR;
+
+        default:
+          fmt::println("Something went wrong!");
+          return tsp::State::ERROR;
       }
     }
   }
@@ -200,6 +213,10 @@ tsp::State handle(const std::variant<Ret, Error>& result) noexcept {
         case tsp::ErrorRead::BAD_DATA:
           fmt::println("Wrong format of data!\n");
           input::help_page();
+          return tsp::State::ERROR;
+
+        default:
+          fmt::println("Something went wrong!");
           return tsp::State::ERROR;
       }
     }

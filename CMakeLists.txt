@@ -10,3 +10,13 @@ set(CMAKE_C_STANDARD_REQUIRED ON)
 include(Packages.cmake)
 add_subdirectory(external)
 add_subdirectory(src)
+
+add_compile_options(/MT)
+
+if(CMAKE_BUILD_TYPE MATCHES Debug)
+    add_compile_options(/Od /Zi)
+elseif(CMAKE_BUILD_TYPE MATCHES Release)
+    add_compile_options(/O2 /Ob3 /Oi /arch:SSE4.2)
+ else()
+     message(FATAL_ERROR "Unknown build type: ${CMAKE_BUILD_TYPE}")
+endif()
