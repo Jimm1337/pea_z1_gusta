@@ -26,7 +26,7 @@ void help_page() noexcept {
   "algorithm_parameter = 1000\n\n"
   "[optimal]\n"
   "path = 2 3 0 1 4 5\n"
-  "cost = 150");
+  "cost = 150\n");
 }
 
 [[nodiscard]] std::variant<tsp::Instance, tsp::ErrorConfig> read(
@@ -265,7 +265,7 @@ void help_page() noexcept {
   " -nn: Use Nearest Neighbour algorithm\n"
   " -r : Use Random algorithm\n\n"
   "Example:\n"
-  "pea_z1_gusta --config=C:/dev/pea_z1_gusta/configs/test_6.ini -r");
+  "pea_z1_gusta --config=C:/dev/pea_z1_gusta/configs/test_6.ini -r\n");
 }
 
 [[nodiscard]] std::variant<tsp::Arguments, tsp::ErrorArg> read(
