@@ -61,3 +61,16 @@ cost = 123
 ```powershell
 > ./pea_z1_gusta.exe --config=../data/configs/config.ini -nn
 ```
+
+# Dane:
+### Folder data:
+- dr_lopuszynski: Dane dr. Łopuszyńskiego
+  - configs: Pliki konfiguracyjne
+  - pliki: Pliki wejściowe
+- dr_mierzwa: Dane dr. Mierzwy
+  - configs: Pliki konfiguracyjne
+  - pliki: Pliki wejściowe
+
+# Rozwiązania problemów z uruchomieniem:
+1. Zainstalować MSVC CRT (VC_redist.x64.exe)
+2. Jeśli dalej nie działa to uruchomić pea_z1_gusta-no-sse.exe zamiast pea_z1_gusta.exe
