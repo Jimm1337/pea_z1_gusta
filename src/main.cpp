@@ -20,6 +20,7 @@ int main(int argc, const char** argv) {
   }
   const tsp::Instance config {std::get<tsp::Instance>(config_result)};
 
+  // set priority for process and thread for more consistent results.
   if (SetPriorityClass(GetCurrentProcess(), HIGH_PRIORITY_CLASS) == 0 ||
       SetThreadPriority(GetCurrentThread(), THREAD_PRIORITY_HIGHEST) == 0) {
     fmt::println(

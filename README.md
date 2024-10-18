@@ -55,7 +55,7 @@ cost = 123
   - BruteForce (-bf)
   - NearestNeighbour (-nn)
   - Random (-r)
-    - Parametr: liczba iteracji
+    - Parametr: liczba ms powtarzania algorytmu
 
 #### Przykład:
 ```powershell

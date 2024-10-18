@@ -169,7 +169,7 @@ void report(const tsp::Arguments& arguments,
       break;
     case tsp::Algorithm::RANDOM:
       fmt::println("Algorithm (Random)");
-      fmt::println("- Count of iterations: {}\n", parameter);
+      fmt::println("- Running time: {} ms\n", parameter);
       break;
     default:
       fmt::println("[E] Something went wrong");

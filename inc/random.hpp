@@ -6,6 +6,6 @@ namespace random {
 
 [[nodiscard]] std::variant<tsp::Solution, tsp::ErrorAlgorithm> run(
 const tsp::Matrix<int>& matrix,
-int                     itr) noexcept;
+int                     time_ms) noexcept;
 
 }    // namespace random

@@ -98,8 +98,10 @@ namespace random {
 
 [[nodiscard]] std::variant<tsp::Solution, tsp::ErrorAlgorithm> run(
 const tsp::Matrix<int>& matrix,
-const int               itr) noexcept {
-  if (itr < 1) {
+const int               time_ms) noexcept {
+  const auto start {std::chrono::high_resolution_clock::now()};
+
+  if (time_ms < 1) {
     return tsp::ErrorAlgorithm::INVALID_PARAM;
   }
 
@@ -117,7 +119,13 @@ const int               itr) noexcept {
 
   tsp::Solution best {.path = {}, .cost = std::numeric_limits<int>::max()};
 
-  for (int iteration {0}; iteration < itr; ++iteration) {
+  // run for specified time
+  while (true) {
+    const tsp::Time elapsed{std::chrono::high_resolution_clock::now() - start};
+    if (elapsed.count() > time_ms) {
+      break;
+    }
+
     impl::algorithm(matrix, random_source, best);
   }
 
