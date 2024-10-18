@@ -72,5 +72,6 @@ cost = 123
   - pliki: Pliki wejściowe
 
 # Rozwiązania problemów z uruchomieniem:
-1. Zainstalować MSVC CRT (VC_redist.x64.exe)
-2. Jeśli dalej nie działa to uruchomić pea_z1_gusta-no-sse.exe zamiast pea_z1_gusta.exe
+1. Uruchomić z terminala
+2. Zainstalować MSVC CRT (VC_redist.x64.exe)
+3. Jeśli dalej nie działa to uruchomić pea_z1_gusta-no-sse.exe zamiast pea_z1_gusta.exe
