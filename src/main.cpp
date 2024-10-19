@@ -1,4 +1,5 @@
 #include "bf.hpp"
+#include "bxb.hpp"
 #include "nn.hpp"
 #include "random.hpp"
 #include "util.hpp"

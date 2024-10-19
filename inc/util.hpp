@@ -234,7 +234,7 @@ requires std::invocable<Func, const tsp::Matrix<int>&, AditionalParams...>
 [[nodiscard]] std::variant<tsp::Result, tsp::ErrorAlgorithm> measured_run(
 Func                    algorithm,
 const tsp::Matrix<int>& input,
-AditionalParams... params) noexcept {
+AditionalParams&&... params) noexcept {
   const auto start {std::chrono::high_resolution_clock::now()};
 
   const std::variant<tsp::Solution, tsp::ErrorAlgorithm> solution {
