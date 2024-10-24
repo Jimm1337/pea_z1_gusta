@@ -173,6 +173,7 @@ void report(const tsp::Arguments& arguments,
       break;
     case tsp::Algorithm::BXB_LEAST_COST:
       fmt::println("Algorithm (BxB Least Cost)");
+      break;
     default:
       fmt::println("[E] Something went wrong");
       break;

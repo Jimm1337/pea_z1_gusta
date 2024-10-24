@@ -24,8 +24,6 @@ struct Adjacent {
 struct Node {
   std::list<Node> children;
   WorkingSolution value;
-  bool            explored {false};
-  bool            no_path_flag {false};
 };
 
 constexpr static void mark_used(tsp::Matrix<int>& matrix,
@@ -46,7 +44,7 @@ constexpr static void mark_used(tsp::Matrix<int>& matrix,
 }
 
 // return: reduction cost
-[[nodiscard]] static constexpr int reduce(tsp::Matrix<int>& matrix) noexcept {
+[[nodiscard]] constexpr static int reduce(tsp::Matrix<int>& matrix) noexcept {
   const size_t v_count {matrix.size()};
 
   // reduce the matrix and find the reduction cost
@@ -97,7 +95,7 @@ constexpr static void mark_used(tsp::Matrix<int>& matrix,
   return reduction_cost;
 }
 
-[[nodiscard]] static constexpr std::vector<Adjacent> get_adjacent(
+[[nodiscard]] constexpr static std::vector<Adjacent> get_adjacent(
 const tsp::Matrix<int>& matrix,
 int                     vertex) noexcept {
   const size_t v_count {matrix.size()};
@@ -114,36 +112,28 @@ int                     vertex) noexcept {
   return result;
 }
 
-static void branch_node(Node& node) noexcept {
-  if (node.explored) {
-    return;
-  }
-
+static void branch(Node& node) noexcept {
   // add all possible not explored paths from current node to solution space
   for (const auto& adjacent :
        get_adjacent(node.value.matrix, node.value.path.back())) {
     node.children.emplace_back(
-    Node {.children     = {},
-          .value        = {[&adjacent, &node]() noexcept {
+    Node {.children = {},
+          .value    = {[&adjacent, &node]() noexcept {
             tsp::Matrix<int> new_matrix {node.value.matrix};
             mark_used(new_matrix, node.value.path.back(), adjacent.vertex);
             const int reduction_cost {reduce(new_matrix)};
 
             return WorkingSolution {
-                     .matrix = std::move(new_matrix),
-                     .path =
+                 .matrix = std::move(new_matrix),
+                 .path =
               [&adjacent, &node]() noexcept {
                 std::vector new_path {node.value.path};
                 new_path.emplace_back(adjacent.vertex);
                 return new_path;
               }(),
-                     .cost = node.value.cost + reduction_cost + adjacent.cost};
-          }()},
-          .explored     = false,
-          .no_path_flag = false});
+                 .cost = node.value.cost + reduction_cost + adjacent.cost};
+          }()}});
   }
-
-  node.explored = true;
 }
 
 static tsp::Solution algorithm(const tsp::Matrix<int>& matrix,
@@ -159,12 +149,10 @@ static tsp::Solution algorithm(const tsp::Matrix<int>& matrix,
 
   // init solution space
   Node root {
-    .children     = {},
-    .value        = {.matrix = root_matrix,
-                     .path   = {starting_vertex},
-                     .cost   = root_reduce_cost},
-    .explored     = false,
-    .no_path_flag = false,
+    .children = {},
+    .value    = {.matrix = root_matrix,
+                 .path   = {starting_vertex},
+                 .cost   = root_reduce_cost}
   };
 
   // remember current best for bounding
@@ -188,7 +176,7 @@ static tsp::Solution algorithm(const tsp::Matrix<int>& matrix,
       continue;
     }
 
-    branch_node(node);
+    branch(node);
 
     // if leaf add return and compare with best, if no return path ignore
     if (node.value.path.size() >= v_count) [[unlikely]] {
@@ -202,14 +190,11 @@ static tsp::Solution algorithm(const tsp::Matrix<int>& matrix,
           current_best = {.path = node.value.path, .cost = node.value.cost};
         }
       }
-      // if not leaf and no children -> no path, do not explore
-    } else if (node.children.empty()) [[unlikely]] {
-      node.no_path_flag = true;
     }
 
     // add viable children to priority queue
     for (auto& child : node.children) {
-      if (child.value.cost < current_best.cost && !child.no_path_flag) [[unlikely]] {
+      if (child.value.cost < current_best.cost) [[unlikely]] {
         least_cost_heap.push(&child);
       }
     }
