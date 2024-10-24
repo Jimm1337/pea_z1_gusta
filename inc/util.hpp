@@ -28,6 +28,7 @@ enum class Algorithm : uint_fast8_t {
   BRUTE_FORCE,
   NEAREST_NEIGHBOUR,
   RANDOM,
+  BXB_LEAST_COST,
   INVALID,
 };
 

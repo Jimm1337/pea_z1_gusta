@@ -171,6 +171,8 @@ void report(const tsp::Arguments& arguments,
       fmt::println("Algorithm (Random)");
       fmt::println("- Running time: {} ms\n", parameter);
       break;
+    case tsp::Algorithm::BXB_LEAST_COST:
+      fmt::println("Algorithm (BxB Least Cost)");
     default:
       fmt::println("[E] Something went wrong");
       break;
@@ -286,6 +288,7 @@ const char** argv) noexcept {
   const bool algo_nn {std::ranges::find(arg_vec, "-nn") != arg_vec.end()};
   const bool algo_bf {std::ranges::find(arg_vec, "-bf") != arg_vec.end()};
   const bool algo_random {std::ranges::find(arg_vec, "-r") != arg_vec.end()};
+  const bool algo_bxblc {std::ranges::find(arg_vec, "-lc") != arg_vec.end()};
 
   const std::string config_path {[&arg_vec]() noexcept {
     const auto itr {std::ranges::find_if(arg_vec, [](const std::string& str) {
@@ -302,19 +305,23 @@ const char** argv) noexcept {
     return tsp::ErrorArg::BAD_ARG;
   }
 
-  const int algo_count {[&algo_bf, &algo_random, &algo_nn]() noexcept {
-    int count {0};
-    if (algo_bf) {
-      ++count;
-    }
-    if (algo_nn) {
-      ++count;
-    }
-    if (algo_random) {
-      ++count;
-    }
-    return count;
-  }()};
+  const int algo_count {
+    [&algo_bf, &algo_random, &algo_nn, &algo_bxblc]() noexcept {
+      int count {0};
+      if (algo_bf) {
+        ++count;
+      }
+      if (algo_nn) {
+        ++count;
+      }
+      if (algo_random) {
+        ++count;
+      }
+      if (algo_bxblc) {
+        ++count;
+      }
+      return count;
+    }()};
   if (algo_count > 1) [[unlikely]] {
     return tsp::ErrorArg::MULTIPLE_ARG;
   }
@@ -322,12 +329,13 @@ const char** argv) noexcept {
     return tsp::ErrorArg::NO_ARG;
   }
 
-  return tsp::Arguments {.algorithm   = algo_nn
-                                      ? tsp::Algorithm::NEAREST_NEIGHBOUR
-                                      : algo_bf ? tsp::Algorithm::BRUTE_FORCE
-                                      : algo_random ? tsp::Algorithm::RANDOM
-                                                    : tsp::Algorithm::INVALID,
-                         .config_file = std::filesystem::absolute(config_path)};
+  return tsp::Arguments {
+    .algorithm   = algo_nn     ? tsp::Algorithm::NEAREST_NEIGHBOUR
+                 : algo_bf     ? tsp::Algorithm::BRUTE_FORCE
+                 : algo_random ? tsp::Algorithm::RANDOM
+                 : algo_bxblc  ? tsp::Algorithm::BXB_LEAST_COST
+                               : tsp::Algorithm::INVALID,
+    .config_file = std::filesystem::absolute(config_path)};
 }
 
 }    // namespace util::arg

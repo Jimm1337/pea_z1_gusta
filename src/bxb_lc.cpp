@@ -1,11 +1,9 @@
-#include "../cmake-build-debug/_deps/fmt-src/include/fmt/args.h"
 #include "bxb.hpp"
+#include "fmt/args.h"
 #include "util.hpp"
 #include <type_traits>
 
-#include <cassert>
 #include <cstddef>
-#include <execution>
 #include <functional>
 #include <limits>
 #include <list>
@@ -30,9 +28,6 @@ struct Adjacent {
 constexpr static void mark_used(tsp::Matrix<int>& matrix,
                                 int               last_v,
                                 int               next_v) noexcept {
-  assert(last_v < matrix.size());
-  assert(next_v < matrix.size());
-
   // mark last_v as unconnected
   for (auto& cost : matrix.at(last_v)) {
     cost = -1;
@@ -102,8 +97,6 @@ constexpr static void mark_used(tsp::Matrix<int>& matrix,
 [[nodiscard]] static constexpr std::vector<Adjacent> get_adjacent(
 const tsp::Matrix<int>& matrix,
 int                     vertex) noexcept {
-  assert(vartex < matrix.size());
-
   const size_t v_count {matrix.size()};
 
   std::vector<Adjacent> result {};
@@ -125,23 +118,22 @@ public:
     friend class SolutionSpace;
 
   private:
-    template<typename Val>
-    requires std::is_same_v<std::remove_cvref_t<Val>, WorkingSolution>
-    Node(Val&&                                              val,
+    Node(const WorkingSolution&                             val,
          const std::optional<std::reference_wrapper<Node>>& parent) noexcept:
       parent {parent},
-      value {std::forward<Val>(val)} {
+      value {val} {
     }
 
     std::list<Node>                             children;
     std::optional<std::reference_wrapper<Node>> parent;
+    bool                                        explored {false};
     bool                                        no_path_flag {false};
 
   public:
     WorkingSolution value;
 
     [[nodiscard]] constexpr bool is_leaf() const noexcept {
-      return value.path.size() == value.matrix.size();
+      return value.path.size() >= value.matrix.size();
     }
 
     void branch() noexcept {
@@ -149,16 +141,37 @@ public:
         get_adjacent(value.matrix, value.path.back())};
 
       // check if there is a path
-      if (adj_vertices.empty()) {
-        if (!is_leaf()) [[unlikely]] {
-          no_path_flag = true;
-        }
-
+      if (adj_vertices.empty() && !is_leaf()) [[unlikely]] {
+        no_path_flag = true;
         return;
       }
 
-      // add all possible paths from current node to solution space
+      // add return path if leaf
+      if (is_leaf()) [[unlikely]] {
+        if (const int return_cost {
+              value.matrix.at(value.path.back()).at(value.path.front())};
+            return_cost != -1) {
+          value.cost += return_cost;
+          value.path.emplace_back(value.path.front());
+        }
+        return;
+      }
+
+      // if all children lead to no path then this node is no path as well
+      if (!children.empty() &&
+          std::ranges::all_of(children, [](const Node& child) noexcept {
+            return child.no_path_flag;
+          })) [[unlikely]] {
+        no_path_flag = true;
+        return;
+      }
+
+      // add all possible not explored paths from current node to solution space
       for (const auto& adjacent : adj_vertices) {
+        if (explored) {
+          continue;
+        }
+
         children.emplace_back(
         Node {WorkingSolution {[&adjacent, this]() noexcept {
                 tsp::Matrix<int> new_matrix {value.matrix};
@@ -177,6 +190,8 @@ public:
               }()},
               *this});
       }
+
+      explored = true;
     }
   };
 
@@ -188,8 +203,6 @@ public:
 
   // bfs bound
   void bound(int threshhold) noexcept {
-    assert(threshhold >= 0);
-
     std::queue<std::reference_wrapper<Node>> bfs_queue {{root}};
 
     while (!bfs_queue.empty()) [[likely]] {
@@ -197,8 +210,7 @@ public:
       bfs_queue.pop();
 
       node.children.remove_if([&threshhold](const Node& candidate) noexcept {
-        return candidate.value.cost > threshhold || candidate.no_path_flag ||
-               candidate.is_leaf();
+        return candidate.value.cost > threshhold || candidate.no_path_flag;
       });
 
       for (Node& child : node.children) {
@@ -207,44 +219,39 @@ public:
     }
   }
 
-  [[nodiscard]] static constexpr std::optional<std::reference_wrapper<Node>>
-  next(std::reference_wrapper<Node> node) noexcept {
-    //todo
+  [[nodiscard]] std::optional<std::reference_wrapper<Node>> next() noexcept {
+    std::priority_queue<std::reference_wrapper<Node>,
+                        std::vector<std::reference_wrapper<Node>>,
+                        bool (*)(const Node&, const Node&) noexcept>
+    least_cost_heap {[](const Node& lhs, const Node& rhs) noexcept {
+      return lhs.value.cost > rhs.value.cost;
+    }};
 
-    std::optional<std::reference_wrapper<Node>> smallest {std::nullopt};
+    std::queue<std::reference_wrapper<Node>> bfs_queue {{root}};
+    while (!bfs_queue.empty()) [[unlikely]] {
+      Node& node {bfs_queue.front().get()};
+      bfs_queue.pop();
 
-    while (!smallest.has_value()) {
-      while (node.get().children.empty()) [[unlikely]] {
-        node.get().no_path_flag = true;
-
-        if (node.get().parent.has_value()) [[likely]] {
-          node = *node.get().parent;
-        } else [[unlikely]] {
-          return node.get().parent;
-        }
+      if (node.no_path_flag || node.is_leaf()) {
+        continue;
       }
 
-      std::list<Node>& children {node.get().children};
-
-      for (auto& child : children) {
-        if (!child.no_path_flag &&
-            (!smallest.has_value() ||
-             child.value.cost < smallest->get().value.cost)) {
-          smallest = child;
-        }
-      }
-
-      if (!smallest.has_value()) [[unlikely]] {
-        node = *node.get().parent;
+      for (Node& child : node.children) {
+        bfs_queue.push(child);
+        least_cost_heap.emplace(child);
       }
     }
 
-    return smallest;
+    if (least_cost_heap.empty()) {
+      return std::nullopt;
+    }
+
+    return least_cost_heap.top();
   }
 };
 
-static void algorithm(const tsp::Matrix<int>& matrix,
-                      int                     starting_vertex) noexcept {
+static tsp::Solution algorithm(const tsp::Matrix<int>& matrix,
+                               int starting_vertex) noexcept {
   // reduce initial matrix
   auto [root_matrix, root_reduce_cost] {[&matrix]() noexcept {
     std::pair result {matrix, -1};
@@ -266,7 +273,7 @@ static void algorithm(const tsp::Matrix<int>& matrix,
   for (std::optional<std::reference_wrapper<SolutionSpace::Node>> node_ref {
          space.root};
        node_ref.has_value();
-       node_ref = space.next(*node_ref)) {
+       node_ref = space.next()) {
     SolutionSpace::Node& node {node_ref->get()};
 
     node.branch();
@@ -274,10 +281,41 @@ static void algorithm(const tsp::Matrix<int>& matrix,
     if (node.is_leaf()) [[unlikely]] {
       if (node.value.cost < current_best.cost) [[unlikely]] {
         current_best = {.path = node.value.path, .cost = node.value.cost};
-        space.bound(current_best.cost);
       }
+
+      space.bound(current_best.cost);
     }
   }
+
+  return current_best;
 }
 
 }    // namespace bxb::impl
+
+namespace bxb::lc {
+
+[[nodiscard]] std::variant<tsp::Solution, tsp::ErrorAlgorithm> run(
+const tsp::Matrix<int>& matrix) noexcept {
+  const size_t v_count {matrix.size()};
+
+  if (v_count == 1) [[unlikely]] {    //edge case: 1 vertex
+    return tsp::Solution {.path = {{0}}, .cost = 0};
+  }
+
+  tsp::Solution best {.path = {}, .cost = std::numeric_limits<int>::max()};
+
+  for (int vertex {0}; vertex < v_count; ++vertex) {
+    const tsp::Solution result {impl::algorithm(matrix, vertex)};
+    if (result.cost < best.cost) {
+      best = result;
+    }
+  }
+
+  if (best.cost == std::numeric_limits<int>::max()) [[unlikely]] {
+    return tsp::ErrorAlgorithm::NO_PATH;
+  }
+
+  return best;
+}
+
+}    // namespace bxb::lc
