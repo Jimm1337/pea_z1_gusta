@@ -172,16 +172,16 @@ void report(const tsp::Arguments& arguments,
       fmt::println("- Running time: {} ms\n", parameter);
       break;
     case tsp::Algorithm::BXB_LEAST_COST:
-      fmt::println("Algorithm (BxB Least Cost)");
+      fmt::println("Algorithm (BxB Least Cost)\n");
       break;
     case tsp::Algorithm::BXB_BFS:
-      fmt::println("Algorithm (BxB BFS)");
+      fmt::println("Algorithm (BxB BFS)\n");
       break;
     case tsp::Algorithm::BXB_DFS:
-      fmt::println("Algorithm (BxB DFS)");
+      fmt::println("Algorithm (BxB DFS)\n");
       break;
     default:
-      fmt::println("[E] Something went wrong");
+      fmt::println("[E] Something went wrong\n");
       break;
   }
 
