@@ -3,7 +3,6 @@
 
 #include <cstddef>
 #include <limits>
-#include <list>
 #include <queue>
 #include <utility>
 #include <vector>

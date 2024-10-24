@@ -3,7 +3,6 @@
 
 #include <cstddef>
 #include <limits>
-#include <list>
 #include <queue>
 #include <utility>
 #include <vector>
@@ -19,11 +18,6 @@ struct WorkingSolution {
 struct Adjacent {
   int vertex;
   int cost;
-};
-
-struct Node {
-  std::list<Node> children;
-  WorkingSolution value;
 };
 
 constexpr static void mark_used(tsp::Matrix<int>& matrix,
