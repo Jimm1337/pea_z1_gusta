@@ -174,6 +174,12 @@ void report(const tsp::Arguments& arguments,
     case tsp::Algorithm::BXB_LEAST_COST:
       fmt::println("Algorithm (BxB Least Cost)");
       break;
+    case tsp::Algorithm::BXB_BFS:
+      fmt::println("Algorithm (BxB BFS)");
+      break;
+    case tsp::Algorithm::BXB_DFS:
+      fmt::println("Algorithm (BxB DFS)");
+      break;
     default:
       fmt::println("[E] Something went wrong");
       break;
@@ -266,7 +272,10 @@ void help_page() noexcept {
   "Flags:\n"
   " -bf: Use Brute Force algorithm\n"
   " -nn: Use Nearest Neighbour algorithm\n"
-  " -r : Use Random algorithm\n\n"
+  " -r : Use Random algorithm\n"
+  " -lc: Use Branch and Bound Least Cost algorithm\n"
+  " -bb: Use Branch and Bound BFS algorithm\n"
+  " -bd: Use Branch and Bound DFS algorithm\n\n"
   "Example:\n"
   "pea_z1_gusta --config=C:/dev/pea_z1_gusta/configs/test_6.ini -r\n");
 }
@@ -290,6 +299,8 @@ const char** argv) noexcept {
   const bool algo_bf {std::ranges::find(arg_vec, "-bf") != arg_vec.end()};
   const bool algo_random {std::ranges::find(arg_vec, "-r") != arg_vec.end()};
   const bool algo_bxblc {std::ranges::find(arg_vec, "-lc") != arg_vec.end()};
+  const bool algo_bxbbfs {std::ranges::find(arg_vec, "-bb") != arg_vec.end()};
+  const bool algo_bxbdfs {std::ranges::find(arg_vec, "-bd") != arg_vec.end()};
 
   const std::string config_path {[&arg_vec]() noexcept {
     const auto itr {std::ranges::find_if(arg_vec, [](const std::string& str) {
@@ -307,7 +318,7 @@ const char** argv) noexcept {
   }
 
   const int algo_count {
-    [&algo_bf, &algo_random, &algo_nn, &algo_bxblc]() noexcept {
+    [&algo_bf, &algo_random, &algo_nn, &algo_bxblc, &algo_bxbbfs, &algo_bxbdfs]() noexcept {
       int count {0};
       if (algo_bf) {
         ++count;
@@ -319,6 +330,12 @@ const char** argv) noexcept {
         ++count;
       }
       if (algo_bxblc) {
+        ++count;
+      }
+      if (algo_bxbbfs) {
+        ++count;
+      }
+      if (algo_bxbdfs) {
         ++count;
       }
       return count;
@@ -335,6 +352,8 @@ const char** argv) noexcept {
                  : algo_bf     ? tsp::Algorithm::BRUTE_FORCE
                  : algo_random ? tsp::Algorithm::RANDOM
                  : algo_bxblc  ? tsp::Algorithm::BXB_LEAST_COST
+                 : algo_bxbbfs ? tsp::Algorithm::BXB_BFS
+                 : algo_bxbdfs ? tsp::Algorithm::BXB_DFS
                                : tsp::Algorithm::INVALID,
     .config_file = std::filesystem::absolute(config_path)};
 }

@@ -29,6 +29,8 @@ enum class Algorithm : uint_fast8_t {
   NEAREST_NEIGHBOUR,
   RANDOM,
   BXB_LEAST_COST,
+  BXB_BFS,
+  BXB_DFS,
   INVALID,
 };
 

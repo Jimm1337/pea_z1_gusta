@@ -55,7 +55,7 @@ constexpr static void mark_used(tsp::Matrix<int>& matrix,
 
     for (int i {0}; i < v_count; ++i) {
       if (const int current_cost {matrix.at(col).at(i)};
-          current_cost != -1 && current_cost < min_cost) {
+          current_cost != -1 && current_cost < min_cost) [[unlikely]] {
         min_cost = current_cost;
       }
     }
@@ -76,7 +76,7 @@ constexpr static void mark_used(tsp::Matrix<int>& matrix,
 
     for (int i {0}; i < v_count; ++i) {
       if (const int current_cost {matrix.at(i).at(row)};
-          current_cost != -1 && current_cost < min_cost) {
+          current_cost != -1 && current_cost < min_cost) [[unlikely]] {
         min_cost = current_cost;
       }
     }
@@ -113,7 +113,7 @@ int                     vertex) noexcept {
 }
 
 static void branch(Node& node) noexcept {
-  // add all possible not explored paths from current node to solution space
+  // add all possible paths from current node to solution space
   for (const auto& adjacent :
        get_adjacent(node.value.matrix, node.value.path.back())) {
     node.children.emplace_back(
