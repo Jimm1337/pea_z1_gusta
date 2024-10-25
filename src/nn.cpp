@@ -50,11 +50,6 @@ static void algorithm(const tsp::Matrix<int>& matrix,
       continue;
     }
 
-    // optimization: trim already worse solutions
-    if (current_cost >= current_best.cost) {
-      continue;
-    }
-
     // explore all adjacent vertices which cost minimal cost to travel to
     std::vector<int> nearest {};
     int              min_cost {std::numeric_limits<int>::max()};

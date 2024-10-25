@@ -10,7 +10,6 @@
 namespace bxb::impl {
 
 struct WorkingSolution {
-  tsp::Matrix<int> matrix;
   std::vector<int> path;
   int              cost;
 };
@@ -18,6 +17,11 @@ struct WorkingSolution {
 struct Adjacent {
   int vertex;
   int cost;
+};
+
+struct TraceResult {
+  tsp::Matrix<int> matrix;
+  int              cost;
 };
 
 constexpr static void mark_used(tsp::Matrix<int>& matrix,
@@ -107,44 +111,66 @@ int                     vertex) noexcept {
 }
 
 constexpr static std::vector<WorkingSolution> branch(
-const WorkingSolution& node) noexcept {
+const WorkingSolution&  node,
+const tsp::Matrix<int>& node_matrix,
+int                     traced_cost) noexcept {
   std::vector<WorkingSolution> children {};
-  children.reserve(node.matrix.size());
 
   // add all possible paths from current node to solution space
-  for (const auto& adjacent : get_adjacent(node.matrix, node.path.back())) {
-    children.emplace_back(WorkingSolution {[&adjacent, &node]() noexcept {
-      tsp::Matrix<int> new_matrix {node.matrix};
+  for (const auto& adjacent : get_adjacent(node_matrix, node.path.back())) {
+    children.emplace_back(
+    WorkingSolution {[&adjacent, &node, &node_matrix, &traced_cost]() noexcept {
+      tsp::Matrix<int> new_matrix {node_matrix};
       mark_used(new_matrix, node.path.back(), adjacent.vertex);
       const int reduction_cost {reduce(new_matrix)};
 
       return WorkingSolution {
-        .matrix = std::move(new_matrix),
         .path =
         [&adjacent, &node]() noexcept {
           std::vector new_path {node.path};
           new_path.emplace_back(adjacent.vertex);
           return new_path;
         }(),
-        .cost = node.cost + reduction_cost + adjacent.cost};
+        .cost = traced_cost + reduction_cost + adjacent.cost};
     }()});
   }
 
   return children;
 }
 
+constexpr static TraceResult trace_matrix(const WorkingSolution&  node,
+                                          const tsp::Matrix<int>& root_matrix,
+                                          int root_reduce_cost) noexcept {
+  tsp::Matrix<int> matrix {root_matrix};
+  int         cost {root_reduce_cost};
+
+  for (int vertex {1}; vertex < node.path.size(); ++vertex) {
+    const int this_node_cost {
+      root_matrix.at(node.path.at(vertex - 1)).at(node.path.at(vertex))};
+
+    mark_used(matrix, node.path.at(vertex - 1), node.path.at(vertex));
+
+    cost += reduce(matrix);
+    cost += this_node_cost;
+  }
+
+  return {.matrix = matrix, .cost = cost};
+}
+
 static void algorithm(const tsp::Matrix<int>& matrix,
-                               int starting_vertex,
-                               tsp::Solution& current_best) noexcept {
+                      int                     starting_vertex,
+                      tsp::Solution&          current_best) noexcept {
   const size_t v_count {matrix.size()};
 
-  std::queue<WorkingSolution> bfs_queue{{[&matrix, &starting_vertex]() noexcept {
-    tsp::Matrix<int> root_matrix {matrix};
-    const int        root_reduce_cost {reduce(root_matrix)};
-    return WorkingSolution {.matrix = std::move(root_matrix),
-                            .path   = {starting_vertex},
-                            .cost   = root_reduce_cost};
-  }()}};
+  const auto [root_matrix, root_reduce_cost] {[&matrix]() noexcept {
+    tsp::Matrix<int> root_mtx {matrix};
+    const int        reduce_cost {reduce(root_mtx)};
+    return std::pair {root_mtx, reduce_cost};
+  }()};
+
+  // priority queue to always explore least cost node
+  std::queue<WorkingSolution> bfs_queue{
+    {WorkingSolution {.path = {starting_vertex}, .cost = root_reduce_cost}}};
 
   while (!bfs_queue.empty()) [[likely]] {
     WorkingSolution node {bfs_queue.front()};
@@ -155,21 +181,25 @@ static void algorithm(const tsp::Matrix<int>& matrix,
       continue;
     }
 
+    // trace reduced matrix
+    const auto [node_matrix, traced_cost] {
+      trace_matrix(node, root_matrix, root_reduce_cost)};
+
     // if leaf add return and compare with best, if no return path ignore
-    if (node.path.size() >= v_count) [[unlikely]] {
+    if (node.path.size() == v_count) [[unlikely]] {
       if (const int return_cost {
-            node.matrix.at(node.path.back()).at(node.path.front())};
+            node_matrix.at(node.path.back()).at(node.path.front())};
           return_cost != -1) {
         node.cost += return_cost;
         node.path.emplace_back(node.path.front());
 
         if (node.cost < current_best.cost) [[unlikely]] {
-          current_best = {.path = node.path, .cost = node.cost};
+          current_best = {.path = std::move(node.path), .cost = node.cost};
         }
       }
     } else [[likely]] {
       // if not leaf add viable children to priority queue
-      for (const auto& child : branch(node)) {
+      for (const auto& child : branch(node, node_matrix, traced_cost)) {
         if (child.cost < current_best.cost) [[unlikely]] {
           bfs_queue.push(child);
         }
@@ -204,4 +234,4 @@ const tsp::Matrix<int>& matrix) noexcept {
   return best;
 }
 
-}    // namespace bxb::lc
+}    // namespace bxb::bfs

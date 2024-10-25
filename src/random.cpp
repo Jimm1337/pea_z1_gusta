@@ -37,11 +37,6 @@ constexpr static void algorithm(const tsp::Matrix<int>& matrix,
   while (work.solution.path.size() != v_count) [[likely]] {
     const size_t starting_size {work.solution.path.size()};
 
-    // optimization: trim already worse path
-    if (work.solution.cost >= current_best.cost) {
-      return;
-    }
-
     // check if path exists
     bool has_path {false};
     for (int vertex {0}; vertex < v_count; ++vertex) {

@@ -55,11 +55,6 @@ static void algorithm(const tsp::Matrix<int>& matrix,
       continue;
     }
 
-    // optimization: trim already worse solutions
-    if (current_cost >= current_best.cost) {
-      continue;
-    }
-
     // explore all valid options (not used in current path)
     std::vector<Candidate> options {};
     for (int vertex {0}; vertex < v_count; ++vertex) {
