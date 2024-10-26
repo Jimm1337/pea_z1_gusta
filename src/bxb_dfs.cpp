@@ -24,7 +24,7 @@ int                     max_cost) noexcept {
   for (int candidate {0}; candidate < v_count; ++candidate) {
     if (const int cost {matrix.at(node.solution.path.back()).at(candidate)};
         !node.used_vertices.at(candidate) && cost != -1 &&
-        node.solution.cost + cost < max_cost) [[unlikely]] {
+        node.solution.cost + cost < max_cost) [[likely]] {
       children.emplace_back([&candidate, &node, &cost]() noexcept {
         WorkingSolution next {node};
         next.solution.path.emplace_back(candidate);
@@ -43,35 +43,35 @@ static void algorithm(const tsp::Matrix<int>& matrix,
                       tsp::Solution&          current_best) {
   const size_t v_count {matrix.size()};
 
-  std::stack<WorkingSolution> dfs_stack{{WorkingSolution {.used_vertices =
+  std::stack<WorkingSolution> dfs_stack {
+    {WorkingSolution {.used_vertices =
                       [&starting_vertex, &v_count]() noexcept {
                         std::vector root_used_v {std::vector(v_count, false)};
                         root_used_v.at(starting_vertex) = true;
                         return root_used_v;
-  }(),
-  .solution = {.path = {starting_vertex}, .cost = 0}}}};
+                      }(),
+                      .solution = {.path = {starting_vertex}, .cost = 0}}}};
 
   while (!dfs_stack.empty()) [[likely]] {
     WorkingSolution node {dfs_stack.top()};
     dfs_stack.pop();
 
+    const int current_v {node.solution.path.back()};
+    const int current_cost {node.solution.cost};
+
     // do not explore if already worse or equal
-    if (node.solution.cost >= current_best.cost) [[likely]] {
+    if (current_cost >= current_best.cost) [[likely]] {
       continue;
     }
 
     // if leaf add return and compare with best, if no return path ignore
     if (node.solution.path.size() == v_count) [[unlikely]] {
-      if (const int return_cost {matrix.at(node.solution.path.back())
-                                 .at(node.solution.path.front())};
-          return_cost != -1) {
-        node.solution.cost += return_cost;
-        node.solution.path.emplace_back(node.solution.path.front());
-
-        if (node.solution.cost < current_best.cost) [[unlikely]] {
-          current_best = {.path = node.solution.path,
-                          .cost = node.solution.cost};
-        }
+      if (const int return_cost {matrix.at(current_v).at(starting_vertex)};
+          return_cost != -1 && current_cost + return_cost < current_best.cost)
+      [[likely]] {
+        current_best       = std::move(node.solution);
+        current_best.cost += return_cost;
+        current_best.path.emplace_back(starting_vertex);
       }
     } else [[likely]] {
       // if not leaf add viable children to priority queue
@@ -82,7 +82,7 @@ static void algorithm(const tsp::Matrix<int>& matrix,
   }
 }
 
-}    // namespace bxb::lc::impl
+}    // namespace bxb::dfs::impl
 
 namespace bxb::dfs {
 
@@ -108,4 +108,4 @@ const tsp::Matrix<int>& matrix) noexcept {
   return best;
 }
 
-}    // namespace bxb::lc
+}    // namespace bxb::dfs

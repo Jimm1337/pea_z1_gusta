@@ -42,7 +42,7 @@ static void algorithm(const tsp::Matrix<int>& matrix,
       if (const int return_cost {matrix.at(current_v).at(starting_vertex)};
           return_cost != -1 && current_cost + return_cost < current_best.cost)
       [[unlikely]] {
-        current_best       = current.solution;
+        current_best       = std::move(current.solution);
         current_best.cost += return_cost;
         current_best.path.emplace_back(starting_vertex);
       }

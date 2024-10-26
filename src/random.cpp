@@ -82,7 +82,7 @@ constexpr static void algorithm(const tsp::Matrix<int>& matrix,
 
   // if generated path would have better cost than current best close it and set new current best
   if (work.solution.cost < current_best.cost) [[unlikely]] {
-    current_best = work.solution;
+    current_best = std::move(work.solution);
     current_best.path.emplace_back(current_best.path.front());
   }
 }

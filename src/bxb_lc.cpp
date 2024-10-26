@@ -63,23 +63,21 @@ static void algorithm(const tsp::Matrix<int>& matrix,
     WorkingSolution node {least_cost_heap.top()};
     least_cost_heap.pop();
 
+    const int current_v {node.solution.path.back()};
+    const int current_cost {node.solution.cost};
+
     // do not explore if already worse or equal
-    if (node.solution.cost >= current_best.cost) [[likely]] {
+    if (current_cost >= current_best.cost) [[likely]] {
       continue;
     }
 
     // if leaf add return and compare with best, if no return path ignore
     if (node.solution.path.size() == v_count) [[unlikely]] {
-      if (const int return_cost {matrix.at(node.solution.path.back())
-                                 .at(node.solution.path.front())};
-          return_cost != -1) {
-        node.solution.cost += return_cost;
-        node.solution.path.emplace_back(node.solution.path.front());
-
-        if (node.solution.cost < current_best.cost) [[unlikely]] {
-          current_best = {.path = node.solution.path,
-                          .cost = node.solution.cost};
-        }
+      if (const int return_cost {matrix.at(current_v).at(starting_vertex)};
+          return_cost != -1 && current_cost + return_cost < current_best.cost) {
+        current_best       = std::move(node.solution);
+        current_best.cost += return_cost;
+        current_best.path.emplace_back(starting_vertex);
       }
     } else [[likely]] {
       // if not leaf add viable children to priority queue
