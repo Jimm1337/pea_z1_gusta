@@ -9,8 +9,8 @@
 namespace nn::impl {
 
 struct WorkingSolution {
-  tsp::Solution     solution;
   std::vector<bool> used_vertices;
+  tsp::Solution     solution;
 };
 
 static void algorithm(const tsp::Matrix<int>& matrix,
@@ -19,16 +19,16 @@ static void algorithm(const tsp::Matrix<int>& matrix,
   const size_t v_count {matrix.size()};
 
   // potential paths to be processed
-  std::queue<WorkingSolution> queue {};
-  queue.push({
-    {.path = {starting_vertex}, .cost = 0},
+  std::queue<WorkingSolution> queue {{WorkingSolution {
+    .used_vertices =
     [&starting_vertex, &v_count]() noexcept {
       std::vector<bool> used {};
       used.resize(v_count, false);
       used.at(starting_vertex) = true;
-      return used;                                  }
-    ()
-  });
+      return used;         }
+    (),
+ .solution = { .path = {starting_vertex}, .cost = 0}
+  }}};
 
   while (!queue.empty()) [[likely]] {
     WorkingSolution current = queue.front();
@@ -46,35 +46,33 @@ static void algorithm(const tsp::Matrix<int>& matrix,
         current_best.cost += return_cost;
         current_best.path.emplace_back(starting_vertex);
       }
+    } else [[likely]] {
+      // explore all adjacent vertices which cost minimal cost to travel to
+      std::vector<int> nearest {};
+      int              min_cost {std::numeric_limits<int>::max()};
+      for (int vertex {0}; vertex < v_count; ++vertex) {
+        const bool used = current.used_vertices.at(vertex);
 
-      continue;
-    }
-
-    // explore all adjacent vertices which cost minimal cost to travel to
-    std::vector<int> nearest {};
-    int              min_cost {std::numeric_limits<int>::max()};
-    for (int vertex {0}; vertex < v_count; ++vertex) {
-      const bool used = current.used_vertices.at(vertex);
-
-      if (const int cost {matrix.at(current_v).at(vertex)};
-          !used && cost != -1 && cost <= min_cost) [[unlikely]] {
-        if (cost < min_cost) [[unlikely]] {
-          nearest.clear();
-          min_cost = cost;
-        }
-        nearest.emplace_back(vertex);
+        if (const int cost {matrix.at(current_v).at(vertex)};
+            !used && cost != -1 && cost <= min_cost) [[unlikely]] {
+              if (cost < min_cost) [[unlikely]] {
+                nearest.clear();
+                min_cost = cost;
+              }
+              nearest.emplace_back(vertex);
+            }
       }
-    }
 
-    // add next paths to be processed for nearest neighbour
-    for (const auto& option : nearest) {
-      queue.push([&current, &option, &min_cost]() noexcept {
-        WorkingSolution next_itr {current};
-        next_itr.solution.path.emplace_back(option);
-        next_itr.solution.cost            += min_cost;
-        next_itr.used_vertices.at(option)  = true;
-        return next_itr;
-      }());
+      // add next paths to be processed for nearest neighbour
+      for (const auto& option : nearest) {
+        queue.push([&current, &option, &min_cost]() noexcept {
+          WorkingSolution next_itr {current};
+          next_itr.solution.path.emplace_back(option);
+          next_itr.solution.cost            += min_cost;
+          next_itr.used_vertices.at(option)  = true;
+          return next_itr;
+        }());
+      }
     }
   }
 }

@@ -7,10 +7,6 @@ set(CMAKE_C_STANDARD 11)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_C_STANDARD_REQUIRED ON)
 
-include(Packages.cmake)
-add_subdirectory(external)
-add_subdirectory(src)
-
 add_compile_options(/MT)
 
 if (CMAKE_BUILD_TYPE MATCHES Debug)
@@ -20,3 +16,7 @@ elseif (CMAKE_BUILD_TYPE MATCHES Release)
 else ()
     message(FATAL_ERROR "Unknown build type: ${CMAKE_BUILD_TYPE} (use Debug or Release)")
 endif ()
+
+include(Packages.cmake)
+add_subdirectory(external)
+add_subdirectory(src)

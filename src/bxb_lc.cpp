@@ -4,215 +4,93 @@
 #include <cstddef>
 #include <limits>
 #include <queue>
-#include <utility>
 #include <vector>
 
-namespace bxb::impl {
+namespace bxb::lc::impl {
 
 struct WorkingSolution {
-  std::vector<int> path;
-  int              cost;
+  std::vector<bool> used_vertices;
+  tsp::Solution     solution;
 };
-
-struct Adjacent {
-  int vertex;
-  int cost;
-};
-
-struct TraceResult {
-  tsp::Matrix<int> matrix;
-  int              cost;
-};
-
-constexpr static void mark_used(tsp::Matrix<int>& matrix,
-                                int               last_v,
-                                int               next_v) noexcept {
-  // mark last_v as unconnected
-  for (auto& cost : matrix.at(last_v)) {
-    cost = -1;
-  }
-
-  // mark next_v as unreachable
-  for (auto& costs_to_next : matrix) {
-    costs_to_next.at(next_v) = -1;
-  }
-
-  // make return not possible
-  matrix.at(next_v).at(last_v) = -1;
-}
-
-// return: reduction cost
-[[nodiscard]] constexpr static int reduce(tsp::Matrix<int>& matrix) noexcept {
-  const size_t v_count {matrix.size()};
-
-  // reduce the matrix and find the reduction cost
-  int reduction_cost {0};
-
-  for (int col {0}; col < v_count; ++col) {
-    int min_cost {std::numeric_limits<int>::max()};
-
-    for (int i {0}; i < v_count; ++i) {
-      if (const int current_cost {matrix.at(col).at(i)};
-          current_cost != -1 && current_cost < min_cost) [[unlikely]] {
-        min_cost = current_cost;
-      }
-    }
-
-    if (min_cost != std::numeric_limits<int>::max()) {
-      for (int i {0}; i < v_count; ++i) {
-        if (matrix.at(col).at(i) != -1) {
-          matrix.at(col).at(i) -= min_cost;
-        }
-      }
-
-      reduction_cost += min_cost;
-    }
-  }
-
-  for (int row {0}; row < v_count; ++row) {
-    int min_cost {std::numeric_limits<int>::max()};
-
-    for (int i {0}; i < v_count; ++i) {
-      if (const int current_cost {matrix.at(i).at(row)};
-          current_cost != -1 && current_cost < min_cost) [[unlikely]] {
-        min_cost = current_cost;
-      }
-    }
-
-    if (min_cost != std::numeric_limits<int>::max()) {
-      for (int i {0}; i < v_count; ++i) {
-        if (matrix.at(i).at(row) != -1) {
-          matrix.at(i).at(row) -= min_cost;
-        }
-      }
-
-      reduction_cost += min_cost;
-    }
-  }
-
-  return reduction_cost;
-}
-
-[[nodiscard]] constexpr static std::vector<Adjacent> get_adjacent(
-const tsp::Matrix<int>& matrix,
-int                     vertex) noexcept {
-  const size_t v_count {matrix.size()};
-
-  std::vector<Adjacent> result {};
-  result.reserve(matrix.size() - 1);
-
-  for (int candidate {0}; candidate < v_count; ++candidate) {
-    if (const int cost {matrix.at(vertex).at(candidate)}; cost != -1) {
-      result.emplace_back(Adjacent {.vertex = candidate, .cost = cost});
-    }
-  }
-
-  return result;
-}
 
 constexpr static std::vector<WorkingSolution> branch(
-const WorkingSolution& node, const tsp::Matrix<int>& node_matrix, int traced_cost) noexcept {
+const tsp::Matrix<int>& matrix,
+const WorkingSolution&  node,
+int                     max_cost) noexcept {
+  const size_t v_count {matrix.size()};
+
   std::vector<WorkingSolution> children {};
 
-  // add all possible paths from current node to solution space
-  for (const auto& adjacent : get_adjacent(node_matrix, node.path.back())) {
-    children.emplace_back(WorkingSolution {[&adjacent, &node, &node_matrix, &traced_cost]() noexcept {
-      tsp::Matrix<int> new_matrix {node_matrix};
-      mark_used(new_matrix, node.path.back(), adjacent.vertex);
-      const int reduction_cost {reduce(new_matrix)};
-
-      return WorkingSolution {
-        .path =
-        [&adjacent, &node]() noexcept {
-          std::vector new_path {node.path};
-          new_path.emplace_back(adjacent.vertex);
-          return new_path;
-        }(),
-        .cost = traced_cost + reduction_cost + adjacent.cost};
-    }()});
+  for (int candidate {0}; candidate < v_count; ++candidate) {
+    if (const int cost {matrix.at(node.solution.path.back()).at(candidate)};
+        !node.used_vertices.at(candidate) && cost != -1 &&
+        node.solution.cost + cost < max_cost) {
+      children.emplace_back([&candidate, &node, &cost]() noexcept {
+        WorkingSolution next {node};
+        next.solution.path.emplace_back(candidate);
+        next.solution.cost               += cost;
+        next.used_vertices.at(candidate)  = true;
+        return next;
+      }());
+    }
   }
 
   return children;
 }
 
-constexpr static TraceResult trace_matrix(const WorkingSolution&  node,
-                                const tsp::Matrix<int>& root_matrix,
-                                int root_reduce_cost) noexcept {
-  tsp::Matrix<int> matrix {root_matrix};
-  int         cost {root_reduce_cost};
-
-  for (int vertex {1}; vertex < node.path.size(); ++vertex) {
-    const int this_node_cost {
-      root_matrix.at(node.path.at(vertex - 1)).at(node.path.at(vertex))};
-
-    mark_used(matrix, node.path.at(vertex - 1), node.path.at(vertex));
-
-    cost += reduce(matrix);
-    cost += this_node_cost;
-  }
-
-  return {.matrix = matrix, .cost = cost};
-}
-
 static void algorithm(const tsp::Matrix<int>& matrix,
                       int                     starting_vertex,
-                      tsp::Solution&          current_best) noexcept {
+                      tsp::Solution&          current_best) {
   const size_t v_count {matrix.size()};
 
-  const auto [root_matrix, root_reduce_cost] {[&matrix]() noexcept {
-    tsp::Matrix<int> root_mtx {matrix};
-    const int        reduce_cost {reduce(root_mtx)};
-    return std::pair {root_mtx, reduce_cost};
-  }()};
-
-  // priority queue to always explore least cost node
   std::priority_queue<WorkingSolution,
                       std::vector<WorkingSolution>,
                       bool (*)(const WorkingSolution&,
                                const WorkingSolution&) noexcept>
   least_cost_heap {
     [](const WorkingSolution& lhs, const WorkingSolution& rhs) noexcept {
-      return lhs.cost > rhs.cost;
+      return lhs.solution.cost > rhs.solution.cost;
     },
-    {WorkingSolution {.path = {starting_vertex}, .cost = root_reduce_cost}}};
+    {WorkingSolution {.used_vertices =
+                      [&starting_vertex, &v_count]() noexcept {
+                        std::vector root_used_v {std::vector(v_count, false)};
+                        root_used_v.at(starting_vertex) = true;
+                        return root_used_v;
+                      }(),
+                      .solution = {.path = {starting_vertex}, .cost = 0}}}};
 
   while (!least_cost_heap.empty()) [[likely]] {
     WorkingSolution node {least_cost_heap.top()};
     least_cost_heap.pop();
 
     // do not explore if already worse or equal
-    if (node.cost >= current_best.cost) [[likely]] {
+    if (node.solution.cost >= current_best.cost) [[likely]] {
       continue;
     }
 
-    // trace reduced matrix
-    const auto [node_matrix, traced_cost] {
-      trace_matrix(node, root_matrix, root_reduce_cost)};
-
     // if leaf add return and compare with best, if no return path ignore
-    if (node.path.size() == v_count) [[unlikely]] {
-      if (const int return_cost {
-            node_matrix.at(node.path.back()).at(node.path.front())};
+    if (node.solution.path.size() == v_count) [[unlikely]] {
+      if (const int return_cost {matrix.at(node.solution.path.back())
+                                 .at(node.solution.path.front())};
           return_cost != -1) {
-        node.cost += return_cost;
-        node.path.emplace_back(node.path.front());
+        node.solution.cost += return_cost;
+        node.solution.path.emplace_back(node.solution.path.front());
 
-        if (node.cost < current_best.cost) [[unlikely]] {
-          current_best = {.path = std::move(node.path), .cost = node.cost};
+        if (node.solution.cost < current_best.cost) [[unlikely]] {
+          current_best = {.path = node.solution.path,
+                          .cost = node.solution.cost};
         }
       }
     } else [[likely]] {
       // if not leaf add viable children to priority queue
-      for (const auto& child : branch(node, node_matrix, traced_cost)) {
-        if (child.cost < current_best.cost) [[unlikely]] {
-          least_cost_heap.push(child);
-        }
+      for (const auto& child : branch(matrix, node, current_best.cost)) {
+        least_cost_heap.emplace(child);
       }
     }
   }
 }
 
-}    // namespace bxb::impl
+}    // namespace bxb::lc::impl
 
 namespace bxb::lc {
 

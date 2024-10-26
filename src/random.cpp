@@ -10,8 +10,8 @@
 namespace random::impl {
 
 struct WorkingSolution {
-  tsp::Solution     solution;
   std::vector<bool> used_vertices;
+  tsp::Solution     solution;
 };
 
 struct RandomSource {
@@ -27,8 +27,8 @@ constexpr static void algorithm(const tsp::Matrix<int>& matrix,
   const size_t v_count {matrix.size()};
 
   WorkingSolution work {
-    .solution      = {.path = {}, .cost = 0},
-    .used_vertices = std::vector(v_count, false)
+    .used_vertices = std::vector(v_count, false),
+    .solution      = {.path = {}, .cost = 0}
   };
 
   work.solution.path.emplace_back(random_source.dist(random_source.engine));

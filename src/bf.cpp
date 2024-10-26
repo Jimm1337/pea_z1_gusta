@@ -14,8 +14,8 @@ struct Candidate {
 };
 
 struct WorkingSolution {
-  tsp::Solution     solution;
   std::vector<bool> used_vertices;
+  tsp::Solution     solution;
 };
 
 static void algorithm(const tsp::Matrix<int>& matrix,
@@ -24,16 +24,16 @@ static void algorithm(const tsp::Matrix<int>& matrix,
   const size_t v_count {matrix.size()};
 
   // potential paths to be processed
-  std::queue<WorkingSolution> queue {};
-  queue.push({
-    {.path = {starting_vertex}, .cost = 0},
+  std::queue<WorkingSolution> queue {{WorkingSolution {
+    .used_vertices =
     [&starting_vertex, &v_count]() noexcept {
       std::vector<bool> used {};
       used.resize(v_count, false);
       used.at(starting_vertex) = true;
-      return used;                                  }
-    ()
-  });
+      return used;         }
+    (),
+ .solution = { .path = {starting_vertex}, .cost = 0}
+  }}};
 
   while (!queue.empty()) [[likely]] {
     WorkingSolution current = queue.front();
@@ -51,30 +51,28 @@ static void algorithm(const tsp::Matrix<int>& matrix,
         current_best.cost += return_cost;
         current_best.path.emplace_back(starting_vertex);
       }
+    } else [[likely]] {
+      // explore all valid options (not used in current path)
+      std::vector<Candidate> options {};
+      for (int vertex {0}; vertex < v_count; ++vertex) {
+        const bool used {current.used_vertices.at(vertex)};
 
-      continue;
-    }
-
-    // explore all valid options (not used in current path)
-    std::vector<Candidate> options {};
-    for (int vertex {0}; vertex < v_count; ++vertex) {
-      const bool used {current.used_vertices.at(vertex)};
-
-      if (const int cost {matrix.at(current_v).at(vertex)}; !used && cost != -1)
-      [[likely]] {
-        options.emplace_back(Candidate {.vertex = vertex, .cost = cost});
+        if (const int cost {matrix.at(current_v).at(vertex)}; !used && cost != -1)
+          [[likely]] {
+            options.emplace_back(Candidate {.vertex = vertex, .cost = cost});
+          }
       }
-    }
 
-    // add next paths to be processed for every valid option
-    for (const auto& option : options) {
-      queue.push([&current, &option]() noexcept {
-        WorkingSolution next_itr {current};
-        next_itr.solution.path.emplace_back(option.vertex);
-        next_itr.solution.cost                   += option.cost;
-        next_itr.used_vertices.at(option.vertex)  = true;
-        return next_itr;
-      }());
+      // add next paths to be processed for every valid option
+      for (const auto& option : options) {
+        queue.push([&current, &option]() noexcept {
+          WorkingSolution next_itr {current};
+          next_itr.solution.path.emplace_back(option.vertex);
+          next_itr.solution.cost                   += option.cost;
+          next_itr.used_vertices.at(option.vertex)  = true;
+          return next_itr;
+        }());
+      }
     }
   }
 }
