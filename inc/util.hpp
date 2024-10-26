@@ -28,6 +28,9 @@ enum class Algorithm : uint_fast8_t {
   BRUTE_FORCE,
   NEAREST_NEIGHBOUR,
   RANDOM,
+  BXB_LEAST_COST,
+  BXB_BFS,
+  BXB_DFS,
   INVALID,
 };
 
@@ -234,7 +237,7 @@ requires std::invocable<Func, const tsp::Matrix<int>&, AditionalParams...>
 [[nodiscard]] std::variant<tsp::Result, tsp::ErrorAlgorithm> measured_run(
 Func                    algorithm,
 const tsp::Matrix<int>& input,
-AditionalParams... params) noexcept {
+AditionalParams&&... params) noexcept {
   const auto start {std::chrono::high_resolution_clock::now()};
 
   const std::variant<tsp::Solution, tsp::ErrorAlgorithm> solution {

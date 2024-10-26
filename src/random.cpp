@@ -10,8 +10,8 @@
 namespace random::impl {
 
 struct WorkingSolution {
-  tsp::Solution     solution;
   std::vector<bool> used_vertices;
+  tsp::Solution     solution;
 };
 
 struct RandomSource {
@@ -27,8 +27,8 @@ constexpr static void algorithm(const tsp::Matrix<int>& matrix,
   const size_t v_count {matrix.size()};
 
   WorkingSolution work {
-    .solution      = {.path = {}, .cost = 0},
-    .used_vertices = std::vector(v_count, false)
+    .used_vertices = std::vector(v_count, false),
+    .solution      = {.path = {}, .cost = 0}
   };
 
   work.solution.path.emplace_back(random_source.dist(random_source.engine));
@@ -36,11 +36,6 @@ constexpr static void algorithm(const tsp::Matrix<int>& matrix,
 
   while (work.solution.path.size() != v_count) [[likely]] {
     const size_t starting_size {work.solution.path.size()};
-
-    // optimization: trim already worse path
-    if (work.solution.cost >= current_best.cost) {
-      return;
-    }
 
     // check if path exists
     bool has_path {false};
@@ -87,7 +82,7 @@ constexpr static void algorithm(const tsp::Matrix<int>& matrix,
 
   // if generated path would have better cost than current best close it and set new current best
   if (work.solution.cost < current_best.cost) [[unlikely]] {
-    current_best = work.solution;
+    current_best = std::move(work.solution);
     current_best.path.emplace_back(current_best.path.front());
   }
 }

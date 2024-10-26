@@ -171,8 +171,17 @@ void report(const tsp::Arguments& arguments,
       fmt::println("Algorithm (Random)");
       fmt::println("- Running time: {} ms\n", parameter);
       break;
+    case tsp::Algorithm::BXB_LEAST_COST:
+      fmt::println("Algorithm (BxB Least Cost)\n");
+      break;
+    case tsp::Algorithm::BXB_BFS:
+      fmt::println("Algorithm (BxB BFS)\n");
+      break;
+    case tsp::Algorithm::BXB_DFS:
+      fmt::println("Algorithm (BxB DFS)\n");
+      break;
     default:
-      fmt::println("[E] Something went wrong");
+      fmt::println("[E] Something went wrong\n");
       break;
   }
 
@@ -263,7 +272,10 @@ void help_page() noexcept {
   "Flags:\n"
   " -bf: Use Brute Force algorithm\n"
   " -nn: Use Nearest Neighbour algorithm\n"
-  " -r : Use Random algorithm\n\n"
+  " -r : Use Random algorithm\n"
+  " -lc: Use Branch and Bound Least Cost algorithm\n"
+  " -bb: Use Branch and Bound BFS algorithm\n"
+  " -bd: Use Branch and Bound DFS algorithm\n\n"
   "Example:\n"
   "pea_z1_gusta --config=C:/dev/pea_z1_gusta/configs/test_6.ini -r\n");
 }
@@ -286,6 +298,9 @@ const char** argv) noexcept {
   const bool algo_nn {std::ranges::find(arg_vec, "-nn") != arg_vec.end()};
   const bool algo_bf {std::ranges::find(arg_vec, "-bf") != arg_vec.end()};
   const bool algo_random {std::ranges::find(arg_vec, "-r") != arg_vec.end()};
+  const bool algo_bxblc {std::ranges::find(arg_vec, "-lc") != arg_vec.end()};
+  const bool algo_bxbbfs {std::ranges::find(arg_vec, "-bb") != arg_vec.end()};
+  const bool algo_bxbdfs {std::ranges::find(arg_vec, "-bd") != arg_vec.end()};
 
   const std::string config_path {[&arg_vec]() noexcept {
     const auto itr {std::ranges::find_if(arg_vec, [](const std::string& str) {
@@ -302,19 +317,29 @@ const char** argv) noexcept {
     return tsp::ErrorArg::BAD_ARG;
   }
 
-  const int algo_count {[&algo_bf, &algo_random, &algo_nn]() noexcept {
-    int count {0};
-    if (algo_bf) {
-      ++count;
-    }
-    if (algo_nn) {
-      ++count;
-    }
-    if (algo_random) {
-      ++count;
-    }
-    return count;
-  }()};
+  const int algo_count {
+    [&algo_bf, &algo_random, &algo_nn, &algo_bxblc, &algo_bxbbfs, &algo_bxbdfs]() noexcept {
+      int count {0};
+      if (algo_bf) {
+        ++count;
+      }
+      if (algo_nn) {
+        ++count;
+      }
+      if (algo_random) {
+        ++count;
+      }
+      if (algo_bxblc) {
+        ++count;
+      }
+      if (algo_bxbbfs) {
+        ++count;
+      }
+      if (algo_bxbdfs) {
+        ++count;
+      }
+      return count;
+    }()};
   if (algo_count > 1) [[unlikely]] {
     return tsp::ErrorArg::MULTIPLE_ARG;
   }
@@ -322,12 +347,15 @@ const char** argv) noexcept {
     return tsp::ErrorArg::NO_ARG;
   }
 
-  return tsp::Arguments {.algorithm   = algo_nn
-                                      ? tsp::Algorithm::NEAREST_NEIGHBOUR
-                                      : algo_bf ? tsp::Algorithm::BRUTE_FORCE
-                                      : algo_random ? tsp::Algorithm::RANDOM
-                                                    : tsp::Algorithm::INVALID,
-                         .config_file = std::filesystem::absolute(config_path)};
+  return tsp::Arguments {
+    .algorithm   = algo_nn     ? tsp::Algorithm::NEAREST_NEIGHBOUR
+                 : algo_bf     ? tsp::Algorithm::BRUTE_FORCE
+                 : algo_random ? tsp::Algorithm::RANDOM
+                 : algo_bxblc  ? tsp::Algorithm::BXB_LEAST_COST
+                 : algo_bxbbfs ? tsp::Algorithm::BXB_BFS
+                 : algo_bxbdfs ? tsp::Algorithm::BXB_DFS
+                               : tsp::Algorithm::INVALID,
+    .config_file = std::filesystem::absolute(config_path)};
 }
 
 }    // namespace util::arg

@@ -1,4 +1,5 @@
 #include "bf.hpp"
+#include "bxb.hpp"
 #include "nn.hpp"
 #include "random.hpp"
 #include "util.hpp"
@@ -35,6 +36,12 @@ int main(int argc, const char** argv) {
         return util::measured_run(nn::run, config.matrix);
       case tsp::Algorithm::RANDOM:
         return util::measured_run(random::run, config.matrix, config.param);
+      case tsp::Algorithm::BXB_LEAST_COST:
+        return util::measured_run(bxb::lc::run, config.matrix);
+      case tsp::Algorithm::BXB_BFS:
+        return util::measured_run(bxb::bfs::run, config.matrix);
+      case tsp::Algorithm::BXB_DFS:
+        return util::measured_run(bxb::dfs::run, config.matrix);
       default:
         std::terminate();
     }
