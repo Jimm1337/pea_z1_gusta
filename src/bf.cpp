@@ -36,7 +36,7 @@ static void algorithm(const tsp::Matrix<int>& matrix,
   }}};
 
   while (!queue.empty()) [[likely]] {
-    WorkingSolution current = queue.front();
+    WorkingSolution current{std::move(queue.front())};
     queue.pop();
 
     const int current_v {current.solution.path.back()};

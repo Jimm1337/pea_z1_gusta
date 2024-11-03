@@ -31,6 +31,7 @@ enum class Algorithm : uint_fast8_t {
   BXB_LEAST_COST,
   BXB_BFS,
   BXB_DFS,
+  TABU_SEARCH,
   INVALID,
 };
 
@@ -71,7 +72,9 @@ struct Instance {
   std::filesystem::path config_file;
   std::filesystem::path input_file;
   Solution              optimal;
-  int                   param;
+  int                   param_1;
+  int                   param_2;
+  int                   param_3;
 };
 
 struct Result {

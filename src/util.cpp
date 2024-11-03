@@ -58,8 +58,12 @@ const std::filesystem::path& config_file) noexcept {
   }
   const tsp::Matrix<int> matrix {std::get<tsp::Matrix<int>>(matrix_result)};
 
-  const int algorithm_parameter {
-    static_cast<int>(reader.GetInteger("instance", "algorithm_parameter", -1))};
+  const int algorithm_parameter_1 {static_cast<int>(
+  reader.GetInteger("instance", "algorithm_parameter_1", -1))};
+  const int algorithm_parameter_2 {static_cast<int>(
+  reader.GetInteger("instance", "algorithm_parameter_2", -1))};
+  const int algorithm_parameter_3 {static_cast<int>(
+  reader.GetInteger("instance", "algorithm_parameter_3", -1))};
 
   const std::string optimal_solution_path {reader.Get("optimal", "path", "")};
   const std::vector optimal_solution_path_parsed {
@@ -103,7 +107,9 @@ const std::filesystem::path& config_file) noexcept {
     .input_file  = input_file_parsed,
     .optimal     = {.path = optimal_solution_path_parsed,
                     .cost = optimal_solution_cost},
-    .param       = algorithm_parameter
+    .param_1     = algorithm_parameter_1,
+    .param_2     = algorithm_parameter_2,
+    .param_3     = algorithm_parameter_3
   };
 }
 
@@ -139,7 +145,9 @@ void report(const tsp::Arguments& arguments,
                config_filename,
                input_filename,
                optimal_solution,
-               parameter] {instance};
+               parameter_1,
+               parameter_2,
+               parameter_3] {instance};
   const auto& [solution, time] {result};
   const auto [count, unit] {parse_duration(time)};
 
@@ -169,7 +177,7 @@ void report(const tsp::Arguments& arguments,
       break;
     case tsp::Algorithm::RANDOM:
       fmt::println("Algorithm (Random)");
-      fmt::println("- Running time: {} ms\n", parameter);
+      fmt::println("- Running time: {} ms\n", parameter_1);
       break;
     case tsp::Algorithm::BXB_LEAST_COST:
       fmt::println("Algorithm (BxB Least Cost)\n");
@@ -179,6 +187,12 @@ void report(const tsp::Arguments& arguments,
       break;
     case tsp::Algorithm::BXB_DFS:
       fmt::println("Algorithm (BxB DFS)\n");
+      break;
+    case tsp::Algorithm::TABU_SEARCH:
+      fmt::println("Algorithm (Tabu Search)");
+      fmt::println("- Count of iterations: {}", parameter_1);
+      fmt::println("- Max iterations with no improvement: {}", parameter_2);
+      fmt::println("- Count of iterations in tabu: {}\n", parameter_3);
       break;
     default:
       fmt::println("[E] Something went wrong\n");
@@ -275,7 +289,8 @@ void help_page() noexcept {
   " -r : Use Random algorithm\n"
   " -lc: Use Branch and Bound Least Cost algorithm\n"
   " -bb: Use Branch and Bound BFS algorithm\n"
-  " -bd: Use Branch and Bound DFS algorithm\n\n"
+  " -bd: Use Branch and Bound DFS algorithm\n"
+  " -ts: Use Tabu Search algorithm\n\n"
   "Example:\n"
   "pea_z1_gusta --config=C:/dev/pea_z1_gusta/configs/test_6.ini -r\n");
 }
@@ -301,6 +316,7 @@ const char** argv) noexcept {
   const bool algo_bxblc {std::ranges::find(arg_vec, "-lc") != arg_vec.end()};
   const bool algo_bxbbfs {std::ranges::find(arg_vec, "-bb") != arg_vec.end()};
   const bool algo_bxbdfs {std::ranges::find(arg_vec, "-bd") != arg_vec.end()};
+  const bool algo_ts {std::ranges::find(arg_vec, "-ts") != arg_vec.end()};
 
   const std::string config_path {[&arg_vec]() noexcept {
     const auto itr {std::ranges::find_if(arg_vec, [](const std::string& str) {
@@ -317,29 +333,37 @@ const char** argv) noexcept {
     return tsp::ErrorArg::BAD_ARG;
   }
 
-  const int algo_count {
-    [&algo_bf, &algo_random, &algo_nn, &algo_bxblc, &algo_bxbbfs, &algo_bxbdfs]() noexcept {
-      int count {0};
-      if (algo_bf) {
-        ++count;
-      }
-      if (algo_nn) {
-        ++count;
-      }
-      if (algo_random) {
-        ++count;
-      }
-      if (algo_bxblc) {
-        ++count;
-      }
-      if (algo_bxbbfs) {
-        ++count;
-      }
-      if (algo_bxbdfs) {
-        ++count;
-      }
-      return count;
-    }()};
+  const int algo_count {[&algo_bf,
+                         &algo_random,
+                         &algo_nn,
+                         &algo_bxblc,
+                         &algo_bxbbfs,
+                         &algo_bxbdfs,
+                         &algo_ts]() noexcept {
+    int count {0};
+    if (algo_bf) {
+      ++count;
+    }
+    if (algo_nn) {
+      ++count;
+    }
+    if (algo_random) {
+      ++count;
+    }
+    if (algo_bxblc) {
+      ++count;
+    }
+    if (algo_bxbbfs) {
+      ++count;
+    }
+    if (algo_bxbdfs) {
+      ++count;
+    }
+    if (algo_ts) {
+      ++count;
+    }
+    return count;
+  }()};
   if (algo_count > 1) [[unlikely]] {
     return tsp::ErrorArg::MULTIPLE_ARG;
   }
@@ -354,6 +378,7 @@ const char** argv) noexcept {
                  : algo_bxblc  ? tsp::Algorithm::BXB_LEAST_COST
                  : algo_bxbbfs ? tsp::Algorithm::BXB_BFS
                  : algo_bxbdfs ? tsp::Algorithm::BXB_DFS
+                 : algo_ts     ? tsp::Algorithm::TABU_SEARCH
                                : tsp::Algorithm::INVALID,
     .config_file = std::filesystem::absolute(config_path)};
 }

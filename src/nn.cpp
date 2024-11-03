@@ -19,19 +19,18 @@ static void algorithm(const tsp::Matrix<int>& matrix,
   const size_t v_count {matrix.size()};
 
   // potential paths to be processed
-  std::queue<WorkingSolution> queue {{WorkingSolution {
-    .used_vertices =
-    [&starting_vertex, &v_count]() noexcept {
-      std::vector<bool> used {};
-      used.resize(v_count, false);
-      used.at(starting_vertex) = true;
-      return used;         }
-    (),
- .solution = { .path = {starting_vertex}, .cost = 0}
-  }}};
+  std::queue<WorkingSolution> queue {
+    {WorkingSolution {.used_vertices =
+                      [&starting_vertex, &v_count]() noexcept {
+                        std::vector<bool> used {};
+                        used.resize(v_count, false);
+                        used.at(starting_vertex) = true;
+                        return used;
+                      }(),
+                      .solution = {.path = {starting_vertex}, .cost = 0}}}};
 
   while (!queue.empty()) [[likely]] {
-    WorkingSolution current = queue.front();
+    WorkingSolution current {std::move(queue.front())};
     queue.pop();
 
     const int current_v {current.solution.path.back()};
@@ -51,16 +50,16 @@ static void algorithm(const tsp::Matrix<int>& matrix,
       std::vector<int> nearest {};
       int              min_cost {std::numeric_limits<int>::max()};
       for (int vertex {0}; vertex < v_count; ++vertex) {
-        const bool used = current.used_vertices.at(vertex);
+        const bool used {current.used_vertices.at(vertex)};
 
         if (const int cost {matrix.at(current_v).at(vertex)};
             !used && cost != -1 && cost <= min_cost) [[unlikely]] {
-              if (cost < min_cost) [[unlikely]] {
-                nearest.clear();
-                min_cost = cost;
-              }
-              nearest.emplace_back(vertex);
-            }
+          if (cost < min_cost) [[unlikely]] {
+            nearest.clear();
+            min_cost = cost;
+          }
+          nearest.emplace_back(vertex);
+        }
       }
 
       // add next paths to be processed for nearest neighbour

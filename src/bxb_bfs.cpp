@@ -53,7 +53,7 @@ static void algorithm(const tsp::Matrix<int>& matrix,
                       .solution = {.path = {starting_vertex}, .cost = 0}}}};
 
   while (!bfs_queue.empty()) [[likely]] {
-    WorkingSolution node {bfs_queue.front()};
+    WorkingSolution node {std::move(bfs_queue.front())};
     bfs_queue.pop();
 
     const int current_v {node.solution.path.back()};
