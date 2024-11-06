@@ -13,20 +13,30 @@ namespace util::config {
 
 void help_page() noexcept {
   fmt::println(
-  "Expecting ini config file of the form:\n\n"
+  "\n\nHelp:\n\nExpecting ini config file of the form:\n\n"
   "[instance]\n"
-  "input_path = <input path string>\n"
-  "(optional) algorithm_parameter = <integer parameter>\n\n"
+  "input_path = <input path string>\n\n"
   "[optimal]\n"
   "(optional) path = <integer node><space><integer node><space>...\n"
   "(optional) cost = <integer cost>\n\n"
-  "Example:\n"
+  "[random]\n"
+  "millis = <integer running time in ms>\n\n"
+  "[tabu_search]\n"
+  "itr = <integer max iterations>\n"
+  "max_itr_no_improve = <integer iterations to halt with no improvement>\n"
+  "tabu_itr = <integer iterations in tabu>\n\n"
+  "- Example:\n\n"
   "[instance]\n"
-  "input_path = C:/dev/pea_z1_gusta/data/test_6_as.txt\n"
-  "algorithm_parameter = 1000\n\n"
+  "input_path = C:/dev/pea_z1_gusta/data/test_6_as.txt\n\n"
   "[optimal]\n"
   "path = 2 3 0 1 4 5\n"
-  "cost = 150\n");
+  "cost = 150\n\n"
+  "[random]\n"
+  "millis = 1000\n\n"
+  "[tabu_search]\n"
+  "itr = 10000\n"
+  "max_itr_no_improve = 50\n"
+  "tabu_itr = 10\n\n");
 }
 
 [[nodiscard]] std::variant<tsp::Instance, tsp::ErrorConfig> read(
@@ -58,12 +68,16 @@ const std::filesystem::path& config_file) noexcept {
   }
   const tsp::Matrix<int> matrix {std::get<tsp::Matrix<int>>(matrix_result)};
 
-  const int algorithm_parameter_1 {static_cast<int>(
-  reader.GetInteger("instance", "algorithm_parameter_1", -1))};
-  const int algorithm_parameter_2 {static_cast<int>(
-  reader.GetInteger("instance", "algorithm_parameter_2", -1))};
-  const int algorithm_parameter_3 {static_cast<int>(
-  reader.GetInteger("instance", "algorithm_parameter_3", -1))};
+  const tsp::Param algo_params {
+    .random      = {.millis =
+                    static_cast<int>(reader.GetInteger("random", "millis", -1))},
+    .tabu_search = {.count_of_itr = static_cast<int>(
+                    reader.GetInteger("tabu_search", "itr", -1)),
+                    .max_itr_no_improve = static_cast<int>(
+                    reader.GetInteger("tabu_search", "max_itr_no_improve", -1)),
+                    .count_of_tabu_itr = static_cast<int>(
+                    reader.GetInteger("tabu_search", "tabu_itr", -1))}
+  };
 
   const std::string optimal_solution_path {reader.Get("optimal", "path", "")};
   const std::vector optimal_solution_path_parsed {
@@ -107,9 +121,7 @@ const std::filesystem::path& config_file) noexcept {
     .input_file  = input_file_parsed,
     .optimal     = {.path = optimal_solution_path_parsed,
                     .cost = optimal_solution_cost},
-    .param_1     = algorithm_parameter_1,
-    .param_2     = algorithm_parameter_2,
-    .param_3     = algorithm_parameter_3
+    .params = algo_params
   };
 }
 
@@ -145,9 +157,7 @@ void report(const tsp::Arguments& arguments,
                config_filename,
                input_filename,
                optimal_solution,
-               parameter_1,
-               parameter_2,
-               parameter_3] {instance};
+               params] {instance};
   const auto& [solution, time] {result};
   const auto [count, unit] {parse_duration(time)};
 
@@ -177,7 +187,7 @@ void report(const tsp::Arguments& arguments,
       break;
     case tsp::Algorithm::RANDOM:
       fmt::println("Algorithm (Random)");
-      fmt::println("- Running time: {} ms\n", parameter_1);
+      fmt::println("- Running time: {} ms\n", params.random.millis);
       break;
     case tsp::Algorithm::BXB_LEAST_COST:
       fmt::println("Algorithm (BxB Least Cost)\n");
@@ -190,9 +200,9 @@ void report(const tsp::Arguments& arguments,
       break;
     case tsp::Algorithm::TABU_SEARCH:
       fmt::println("Algorithm (Tabu Search)");
-      fmt::println("- Count of iterations: {}", parameter_1);
-      fmt::println("- Max iterations with no improvement: {}", parameter_2);
-      fmt::println("- Count of iterations in tabu: {}\n", parameter_3);
+      fmt::println("- Count of iterations: {}", params.tabu_search.count_of_itr);
+      fmt::println("- Max iterations with no improvement: {}", params.tabu_search.max_itr_no_improve);
+      fmt::println("- Count of iterations in tabu: {}\n", params.tabu_search.count_of_tabu_itr);
       break;
     default:
       fmt::println("[E] Something went wrong\n");

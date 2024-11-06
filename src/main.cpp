@@ -39,7 +39,7 @@ int main(int argc, const char** argv) {
       case tsp::Algorithm::NEAREST_NEIGHBOUR:
         return util::measured_run(nn::run, config.matrix);
       case tsp::Algorithm::RANDOM:
-        return util::measured_run(random::run, config.matrix, config.param_1);
+        return util::measured_run(random::run, config.matrix, config.params.random.millis);
       case tsp::Algorithm::BXB_LEAST_COST:
         return util::measured_run(bxb::lc::run, config.matrix);
       case tsp::Algorithm::BXB_BFS:
@@ -49,9 +49,9 @@ int main(int argc, const char** argv) {
       case tsp::Algorithm::TABU_SEARCH:
         return util::measured_run(ts::run,
                                   config.matrix,
-                                  config.param_1,
-                                  config.param_2,
-                                  config.param_3);
+                                  config.params.tabu_search.count_of_itr,
+                                  config.params.tabu_search.max_itr_no_improve,
+                                  config.params.tabu_search.count_of_tabu_itr);
       default:
         std::terminate();
     }

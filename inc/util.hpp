@@ -67,14 +67,27 @@ struct Solution {
   int              cost;
 };
 
+struct ParamRandom {
+  int millis;
+};
+
+struct ParamTabuSearch {
+  int count_of_itr;
+  int max_itr_no_improve;
+  int count_of_tabu_itr;
+};
+
+struct Param {
+  ParamRandom     random;
+  ParamTabuSearch tabu_search;
+};
+
 struct Instance {
   Matrix<int>           matrix;
   std::filesystem::path config_file;
   std::filesystem::path input_file;
   Solution              optimal;
-  int                   param_1;
-  int                   param_2;
-  int                   param_3;
+  Param                 params;
 };
 
 struct Result {
@@ -145,7 +158,8 @@ tsp::State handle(const std::variant<Ret, Error>& result) noexcept {
           return tsp::State::ERROR;
 
         case tsp::ErrorAlgorithm::INVALID_PARAM:
-          fmt::println("Invalid parameter specified!");
+          fmt::println("Invalid parameter specified in config!");
+          config::help_page();
           return tsp::State::ERROR;
 
         default:
