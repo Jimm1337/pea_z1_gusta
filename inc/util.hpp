@@ -32,6 +32,7 @@ enum class Algorithm : uint_fast8_t {
   BXB_BFS,
   BXB_DFS,
   TABU_SEARCH,
+  GENETIC,
   INVALID,
 };
 
@@ -72,14 +73,23 @@ struct ParamRandom {
 };
 
 struct ParamTabuSearch {
-  int count_of_itr;
+  int itr;
   int max_itr_no_improve;
-  int count_of_tabu_itr;
+  int tabu_itr;
+};
+
+struct ParamGenetic {
+  int itr;
+  int population_size;
+  int count_of_children;
+  int crossovers_per_100;
+  int mutations_per_1000;
 };
 
 struct Param {
   ParamRandom     random;
   ParamTabuSearch tabu_search;
+  ParamGenetic    genetic;
 };
 
 struct Instance {
@@ -88,6 +98,7 @@ struct Instance {
   std::filesystem::path input_file;
   Solution              optimal;
   Param                 params;
+  //todo: add info if symetric and full graph, use in algorithms
 };
 
 struct Result {

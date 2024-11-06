@@ -25,6 +25,12 @@ void help_page() noexcept {
   "itr = <integer max iterations>\n"
   "max_itr_no_improve = <integer iterations to halt with no improvement>\n"
   "tabu_itr = <integer iterations in tabu>\n\n"
+  "[genetic]\n"
+  "itr = <integer iterations>\n"
+  "population_size = <integer population after selection>\n"
+  "count_of_children = <integer count of children per pair>\n"
+  "crossovers_per_100 = <integer percent of passed pairs to reproduce>\n"
+  "mutations_per_1000 = <integer ppt of chromosomes to mutate before selection>\n\n"
   "- Example:\n\n"
   "[instance]\n"
   "input_path = C:/dev/pea_z1_gusta/data/test_6_as.txt\n\n"
@@ -36,7 +42,13 @@ void help_page() noexcept {
   "[tabu_search]\n"
   "itr = 10000\n"
   "max_itr_no_improve = 50\n"
-  "tabu_itr = 10\n\n");
+  "tabu_itr = 10\n\n"
+  "[genetic]\n"
+  "itr = 100000\n"
+  "population_size = 50\n"
+  "count_of_children = 8\n"
+  "crossovers_per_100 = 95\n"
+  "mutations_per_1000 = 5\n\n");
 }
 
 [[nodiscard]] std::variant<tsp::Instance, tsp::ErrorConfig> read(
@@ -71,12 +83,22 @@ const std::filesystem::path& config_file) noexcept {
   const tsp::Param algo_params {
     .random      = {.millis =
                     static_cast<int>(reader.GetInteger("random", "millis", -1))},
-    .tabu_search = {.count_of_itr = static_cast<int>(
+    .tabu_search = {.itr = static_cast<int>(
                     reader.GetInteger("tabu_search", "itr", -1)),
                     .max_itr_no_improve = static_cast<int>(
                     reader.GetInteger("tabu_search", "max_itr_no_improve", -1)),
-                    .count_of_tabu_itr = static_cast<int>(
-                    reader.GetInteger("tabu_search", "tabu_itr", -1))}
+                    .tabu_itr = static_cast<int>(
+                    reader.GetInteger("tabu_search", "tabu_itr", -1))},
+    .genetic     = {
+                    .itr = static_cast<int>(reader.GetInteger("genetic", "itr", -1)),
+                    .population_size =
+      static_cast<int>(reader.GetInteger("genetic", "population_size", -1)),
+                    .count_of_children =
+      static_cast<int>(reader.GetInteger("genetic", "count_of_children", -1)),
+                    .crossovers_per_100 =
+      static_cast<int>(reader.GetInteger("genetic", "crossovers_per_100", -1)),
+                    .mutations_per_1000 = static_cast<int>(
+      reader.GetInteger("genetic", "mutations_per_1000", -1))}
   };
 
   const std::string optimal_solution_path {reader.Get("optimal", "path", "")};
@@ -121,7 +143,7 @@ const std::filesystem::path& config_file) noexcept {
     .input_file  = input_file_parsed,
     .optimal     = {.path = optimal_solution_path_parsed,
                     .cost = optimal_solution_cost},
-    .params = algo_params
+    .params      = algo_params
   };
 }
 
@@ -200,9 +222,21 @@ void report(const tsp::Arguments& arguments,
       break;
     case tsp::Algorithm::TABU_SEARCH:
       fmt::println("Algorithm (Tabu Search)");
-      fmt::println("- Count of iterations: {}", params.tabu_search.count_of_itr);
-      fmt::println("- Max iterations with no improvement: {}", params.tabu_search.max_itr_no_improve);
-      fmt::println("- Count of iterations in tabu: {}\n", params.tabu_search.count_of_tabu_itr);
+      fmt::println("- Count of iterations: {}", params.tabu_search.itr);
+      fmt::println("- Max iterations with no improvement: {}",
+                   params.tabu_search.max_itr_no_improve);
+      fmt::println("- Count of iterations in tabu: {}\n",
+                   params.tabu_search.tabu_itr);
+      break;
+    case tsp::Algorithm::GENETIC:
+      fmt::println("Algorithm (Genetic)");
+      fmt::println("- Count of iterations: {}", params.genetic.itr);
+      fmt::println("- Population size: {}", params.genetic.population_size);
+      fmt::println("- Children per pair: {}", params.genetic.count_of_children);
+      fmt::println("- Crossover chance: {}%",
+                   params.genetic.crossovers_per_100);
+      fmt::println("- Mutation chance: {:.1f}\n",
+                   static_cast<double>(params.genetic.mutations_per_1000) / 10);
       break;
     default:
       fmt::println("[E] Something went wrong\n");
@@ -300,7 +334,8 @@ void help_page() noexcept {
   " -lc: Use Branch and Bound Least Cost algorithm\n"
   " -bb: Use Branch and Bound BFS algorithm\n"
   " -bd: Use Branch and Bound DFS algorithm\n"
-  " -ts: Use Tabu Search algorithm\n\n"
+  " -ts: Use Tabu Search algorithm\n"
+  " -g : Use Genetic algorithm\n\n"
   "Example:\n"
   "pea_z1_gusta --config=C:/dev/pea_z1_gusta/configs/test_6.ini -r\n");
 }
@@ -327,6 +362,7 @@ const char** argv) noexcept {
   const bool algo_bxbbfs {std::ranges::find(arg_vec, "-bb") != arg_vec.end()};
   const bool algo_bxbdfs {std::ranges::find(arg_vec, "-bd") != arg_vec.end()};
   const bool algo_ts {std::ranges::find(arg_vec, "-ts") != arg_vec.end()};
+  const bool algo_gen {std::ranges::find(arg_vec, "-g") != arg_vec.end()};
 
   const std::string config_path {[&arg_vec]() noexcept {
     const auto itr {std::ranges::find_if(arg_vec, [](const std::string& str) {
@@ -349,7 +385,8 @@ const char** argv) noexcept {
                          &algo_bxblc,
                          &algo_bxbbfs,
                          &algo_bxbdfs,
-                         &algo_ts]() noexcept {
+                         &algo_ts,
+                         &algo_gen]() noexcept {
     int count {0};
     if (algo_bf) {
       ++count;
@@ -372,6 +409,9 @@ const char** argv) noexcept {
     if (algo_ts) {
       ++count;
     }
+    if (algo_gen) {
+      ++count;
+    }
     return count;
   }()};
   if (algo_count > 1) [[unlikely]] {
@@ -389,6 +429,7 @@ const char** argv) noexcept {
                  : algo_bxbbfs ? tsp::Algorithm::BXB_BFS
                  : algo_bxbdfs ? tsp::Algorithm::BXB_DFS
                  : algo_ts     ? tsp::Algorithm::TABU_SEARCH
+                 : algo_gen    ? tsp::Algorithm::GENETIC
                                : tsp::Algorithm::INVALID,
     .config_file = std::filesystem::absolute(config_path)};
 }

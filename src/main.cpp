@@ -1,5 +1,6 @@
 #include "bf.hpp"
 #include "bxb.hpp"
+#include "gen.hpp"
 #include "nn.hpp"
 #include "random.hpp"
 #include "ts.hpp"
@@ -39,7 +40,9 @@ int main(int argc, const char** argv) {
       case tsp::Algorithm::NEAREST_NEIGHBOUR:
         return util::measured_run(nn::run, config.matrix);
       case tsp::Algorithm::RANDOM:
-        return util::measured_run(random::run, config.matrix, config.params.random.millis);
+        return util::measured_run(random::run,
+                                  config.matrix,
+                                  config.params.random.millis);
       case tsp::Algorithm::BXB_LEAST_COST:
         return util::measured_run(bxb::lc::run, config.matrix);
       case tsp::Algorithm::BXB_BFS:
@@ -49,9 +52,17 @@ int main(int argc, const char** argv) {
       case tsp::Algorithm::TABU_SEARCH:
         return util::measured_run(ts::run,
                                   config.matrix,
-                                  config.params.tabu_search.count_of_itr,
+                                  config.params.tabu_search.itr,
                                   config.params.tabu_search.max_itr_no_improve,
-                                  config.params.tabu_search.count_of_tabu_itr);
+                                  config.params.tabu_search.tabu_itr);
+      case tsp::Algorithm::GENETIC:
+        return util::measured_run(gen::run,
+                                  config.matrix,
+                                  config.params.genetic.itr,
+                                  config.params.genetic.population_size,
+                                  config.params.genetic.count_of_children,
+                                  config.params.genetic.crossovers_per_100,
+                                  config.params.genetic.mutations_per_1000);
       default:
         std::terminate();
     }
