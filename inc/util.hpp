@@ -92,13 +92,18 @@ struct Param {
   ParamGenetic    genetic;
 };
 
+struct GraphInfo {
+  bool symmetric_graph;
+  bool full_graph;
+};
+
 struct Instance {
   Matrix<int>           matrix;
   std::filesystem::path config_file;
   std::filesystem::path input_file;
   Solution              optimal;
   Param                 params;
-  //todo: add info if symetric and full graph, use in algorithms
+  GraphInfo             graph_info;
 };
 
 struct Result {
@@ -260,16 +265,17 @@ tsp::State handle(const std::variant<Ret, Error>& result) noexcept {
 
 namespace util {
 
-template<typename Func, typename... AditionalParams>
-requires std::invocable<Func, const tsp::Matrix<int>&, AditionalParams...>
+template<typename Func, typename... Params>
+requires std::invocable<Func, Params...> &&
+         std::is_same_v<std::invoke_result_t<Func, Params...>,
+                        std::variant<tsp::Solution, tsp::ErrorAlgorithm>>
 [[nodiscard]] std::variant<tsp::Result, tsp::ErrorAlgorithm> measured_run(
-Func                    algorithm,
-const tsp::Matrix<int>& input,
-AditionalParams&&... params) noexcept {
+Func algorithm,
+Params&&... params) noexcept {
   const auto start {std::chrono::high_resolution_clock::now()};
 
   const std::variant<tsp::Solution, tsp::ErrorAlgorithm> solution {
-    algorithm(input, std::forward<AditionalParams>(params)...)};
+    algorithm(std::forward<Params>(params)...)};
 
   const auto end {std::chrono::high_resolution_clock::now()};
 

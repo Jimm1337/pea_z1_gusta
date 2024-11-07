@@ -39,8 +39,8 @@ int                     max_cost) noexcept {
 }
 
 static void algorithm(const tsp::Matrix<int>& matrix,
-                      int                     starting_vertex,
-                      tsp::Solution&          current_best) {
+                      tsp::Solution&          current_best,
+                      int                     starting_vertex) {
   const size_t v_count {matrix.size()};
 
   std::queue<WorkingSolution> bfs_queue {
@@ -87,7 +87,8 @@ static void algorithm(const tsp::Matrix<int>& matrix,
 namespace bxb::bfs {
 
 [[nodiscard]] std::variant<tsp::Solution, tsp::ErrorAlgorithm> run(
-const tsp::Matrix<int>& matrix) noexcept {
+const tsp::Matrix<int>& matrix,
+const tsp::GraphInfo&   graph_info) noexcept {
   const size_t v_count {matrix.size()};
 
   if (v_count == 1) [[unlikely]] {    //edge case: 1 vertex
@@ -96,9 +97,12 @@ const tsp::Matrix<int>& matrix) noexcept {
 
   tsp::Solution best {.path = {}, .cost = std::numeric_limits<int>::max()};
 
-  //repeat for each vertex to get the optimal solution
-  for (int vertex {0}; vertex < v_count; ++vertex) {
-    impl::algorithm(matrix, vertex, best);
+  if (graph_info.full_graph && graph_info.symmetric_graph) {
+    impl::algorithm(matrix, best, 0);
+  } else {
+    for (int vertex {0}; vertex < v_count; ++vertex) {
+      impl::algorithm(matrix, best, vertex);
+    }
   }
 
   if (best.cost == std::numeric_limits<int>::max()) [[unlikely]] {

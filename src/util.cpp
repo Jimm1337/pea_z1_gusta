@@ -15,7 +15,9 @@ void help_page() noexcept {
   fmt::println(
   "\n\nHelp:\n\nExpecting ini config file of the form:\n\n"
   "[instance]\n"
-  "input_path = <input path string>\n\n"
+  "input_path = <input path string>\n"
+  "(optional) symmetric = <symmetric graph? bool>\n"
+  "(optional) full = <full graph? bool>\n\n"
   "[optimal]\n"
   "(optional) path = <integer node><space><integer node><space>...\n"
   "(optional) cost = <integer cost>\n\n"
@@ -33,7 +35,9 @@ void help_page() noexcept {
   "mutations_per_1000 = <integer ppt of chromosomes to mutate before selection>\n\n"
   "- Example:\n\n"
   "[instance]\n"
-  "input_path = C:/dev/pea_z1_gusta/data/test_6_as.txt\n\n"
+  "input_path = C:/dev/pea_z1_gusta/data/test_6_as.txt\n"
+  "symmetric = false\n"
+  "full = true\n\n"
   "[optimal]\n"
   "path = 2 3 0 1 4 5\n"
   "cost = 150\n\n"
@@ -79,6 +83,10 @@ const std::filesystem::path& config_file) noexcept {
     return tsp::ErrorConfig::CAN_NOT_PROCEED;
   }
   const tsp::Matrix<int> matrix {std::get<tsp::Matrix<int>>(matrix_result)};
+
+  const bool symmetric_graph {
+    reader.GetBoolean("instance", "symmetric", false)};
+  const bool full_graph {reader.GetBoolean("instance", "full", false)};
 
   const tsp::Param algo_params {
     .random      = {.millis =
@@ -143,7 +151,9 @@ const std::filesystem::path& config_file) noexcept {
     .input_file  = input_file_parsed,
     .optimal     = {.path = optimal_solution_path_parsed,
                     .cost = optimal_solution_cost},
-    .params      = algo_params
+    .params      = algo_params,
+    .graph_info  = {  .symmetric_graph = symmetric_graph,
+                    .full_graph      = full_graph}
   };
 }
 
@@ -179,9 +189,12 @@ void report(const tsp::Arguments& arguments,
                config_filename,
                input_filename,
                optimal_solution,
-               params] {instance};
+               params,
+               graph_info] {instance};
   const auto& [solution, time] {result};
   const auto [count, unit] {parse_duration(time)};
+
+  const bool optimized {graph_info.full_graph && graph_info.symmetric_graph};
 
   fmt::println("Config ({})", config_filename.generic_string());
   fmt::println("- Input file: {}", input_filename.generic_string());
@@ -203,9 +216,17 @@ void report(const tsp::Arguments& arguments,
   switch (arguments.algorithm) {
     case tsp::Algorithm::BRUTE_FORCE:
       fmt::println("Algorithm (Brute Force)\n");
+      if (optimized) {
+        fmt::println(
+        "Optimization: Single Starting Vertex (full, symmetric)\n");
+      }
       break;
     case tsp::Algorithm::NEAREST_NEIGHBOUR:
       fmt::println("Algorithm (Nearest Neighbour)\n");
+      if (optimized) {
+        fmt::println(
+        "Optimization: Single Starting Vertex (full, symmetric)\n");
+      }
       break;
     case tsp::Algorithm::RANDOM:
       fmt::println("Algorithm (Random)");
@@ -213,12 +234,24 @@ void report(const tsp::Arguments& arguments,
       break;
     case tsp::Algorithm::BXB_LEAST_COST:
       fmt::println("Algorithm (BxB Least Cost)\n");
+      if (optimized) {
+        fmt::println(
+        "Optimization: Single Starting Vertex (full, symmetric)\n");
+      }
       break;
     case tsp::Algorithm::BXB_BFS:
       fmt::println("Algorithm (BxB BFS)\n");
+      if (optimized) {
+        fmt::println(
+        "Optimization: Single Starting Vertex (full, symmetric)\n");
+      }
       break;
     case tsp::Algorithm::BXB_DFS:
       fmt::println("Algorithm (BxB DFS)\n");
+      if (optimized) {
+        fmt::println(
+        "Optimization: Single Starting Vertex (full, symmetric)\n");
+      }
       break;
     case tsp::Algorithm::TABU_SEARCH:
       fmt::println("Algorithm (Tabu Search)");
@@ -235,7 +268,7 @@ void report(const tsp::Arguments& arguments,
       fmt::println("- Children per pair: {}", params.genetic.count_of_children);
       fmt::println("- Crossover chance: {}%",
                    params.genetic.crossovers_per_100);
-      fmt::println("- Mutation chance: {:.1f}\n",
+      fmt::println("- Mutation chance: {:.1f}%\n",
                    static_cast<double>(params.genetic.mutations_per_1000) / 10);
       break;
     default:
