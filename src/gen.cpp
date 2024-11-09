@@ -17,27 +17,24 @@ struct WorkingSolution {
 
   [[nodiscard]] constexpr std::weak_ordering operator<=>(
   const WorkingSolution& other) const noexcept {
-    switch (solution.cost <=> other.solution.cost) {
-      case std::strong_ordering::greater:
-        return std::weak_ordering::greater;
-      case std::strong_ordering::less:
-        return std::weak_ordering::less;
-      case std::strong_ordering::equal:
-        if (solution.path.size() != other.solution.path.size()) {
-          return std::weak_ordering::equivalent;
-        }
-        for (int v {0}; v < solution.path.size(); ++v) {
-          if (solution.path.at(v) < other.solution.path.at(v)) {
-            return std::weak_ordering::less;
-          }
-          if (solution.path.at(v) > other.solution.path.at(v)) {
-            return std::weak_ordering::greater;
-          }
-        }
-        return std::weak_ordering::equivalent;
-      default:
-        return std::weak_ordering::equivalent;
+    const auto cmp{solution.cost <=> other.solution.cost};
+    if (cmp != std::strong_ordering::equal) {
+      return cmp;
     }
+
+    if (solution.path.size() != other.solution.path.size()) {
+      return std::weak_ordering::equivalent;
+    }
+
+    for (int v {0}; v < solution.path.size(); ++v) {
+      if (solution.path.at(v) < other.solution.path.at(v)) {
+        return std::weak_ordering::less;
+      }
+      if (solution.path.at(v) > other.solution.path.at(v)) {
+        return std::weak_ordering::greater;
+      }
+    }
+    return std::weak_ordering::equivalent;
   }
 };
 
@@ -144,9 +141,9 @@ init_population(const tsp::Matrix<int>& matrix,
   while (new_population.size() != population_size) {
     WorkingSolution next {std::get<WorkingSolution>(first_sol_result)};
 
-    using Diff = decltype(next.v_indices)::iterator::difference_type;
-
-    for (Diff i {next.v_indices.end() - next.v_indices.begin() - 1}; i > 0;
+    for (int i {
+           static_cast<int>(next.v_indices.end() - next.v_indices.begin() - 1)};
+         i > 0;
          --i) {
       while (!perform_swap(
       matrix,
@@ -229,8 +226,8 @@ static Population select_and_reproduce(tsp::Matrix<int>& matrix,
                                        std::mt19937_64&  rand_src,
                                        int               count_of_children,
                                        int crossovers_per_100) noexcept {
-  Population population{std::forward<PopulationType>(population)};
-  const size_t population_size{population.size()};
+  Population   population {std::forward<PopulationType>(population)};
+  const size_t population_size {population.size()};
   const size_t max_parents {population_size / count_of_children};
 
   //todo: cut a up to max parents, reproduce, cut up to pop size
