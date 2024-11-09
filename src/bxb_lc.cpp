@@ -1,5 +1,6 @@
 #include "bxb.hpp"
 #include "util.hpp"
+#include "nn.hpp"
 
 #include <cstddef>
 #include <limits>
@@ -101,7 +102,12 @@ const tsp::GraphInfo&   graph_info) noexcept {
     return tsp::Solution {.path = {{0}}, .cost = 0};
   }
 
-  tsp::Solution best {.path = {}, .cost = std::numeric_limits<int>::max()};
+  // upper bound = nn solution
+  const auto upper_bound_result{nn::run(matrix, graph_info)};
+  if (std::holds_alternative<tsp::ErrorAlgorithm>(upper_bound_result)) {
+    return upper_bound_result;
+  }
+  tsp::Solution best {std::get<tsp::Solution>(upper_bound_result)};
 
   if (graph_info.full_graph && graph_info.symmetric_graph) {
     impl::algorithm(matrix, best, 0);

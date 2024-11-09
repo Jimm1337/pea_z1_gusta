@@ -1,5 +1,7 @@
 #include "ts.hpp"
 
+#include "nn.hpp"
+
 #include <stack>
 #include <vector>
 
@@ -19,77 +21,23 @@ struct SwapCandidate {
 };
 
 static std::variant<WorkingSolution, tsp::ErrorAlgorithm> get_first_solution(
-const tsp::Matrix<int>& matrix) noexcept {
+const tsp::Matrix<int>& matrix,
+const tsp::GraphInfo&   graph_info) noexcept {
   const size_t v_count {matrix.size()};
 
-  std::stack<WorkingSolution>   dfs_stack {};
-  std::stack<std::vector<bool>> dfs_used {};
-
-  for (int starting_v {0}; starting_v < v_count; ++starting_v) {
-    dfs_used.emplace([&starting_v, &v_count]() noexcept {
-      std::vector root_used {std::vector(v_count, false)};
-      root_used.at(starting_v) = true;
-      return root_used;
-    }());
-
-    dfs_stack.emplace(
-    [&v_count, &starting_v]() noexcept {
-      std::vector<size_t> indices {};
-      indices.resize(v_count, std::numeric_limits<size_t>::max());
-      indices.at(starting_v) = 0;
-      return indices;
-    }(),
-    tsp::Solution {.path =
-                   [&v_count, &starting_v]() noexcept {
-                     std::vector<int> path {};
-                     path.reserve(v_count);
-                     path.emplace_back(starting_v);
-                     return path;
-                   }(),
-                   .cost = 0});
-
-    while (!dfs_stack.empty()) [[likely]] {
-      WorkingSolution node {std::move(dfs_stack.top())};
-      std::vector     used {std::move(dfs_used.top())};
-      dfs_used.pop();
-      dfs_stack.pop();
-
-      const int current_v {node.solution.path.back()};
-
-      if (node.solution.path.size() == v_count) [[unlikely]] {
-        const int ret_cost {matrix.at(current_v).at(starting_v)};
-
-        if (ret_cost == -1) {
-          continue;
-        }
-
-        node.solution.path.emplace_back(starting_v);
-        node.solution.cost += ret_cost;
-
-        return node;
-      }
-
-      for (int candidate {0}; candidate < v_count; ++candidate) {
-        if (const int cost {matrix.at(current_v).at(candidate)};
-            !used.at(candidate) && cost != -1) {
-          dfs_used.emplace([&used, &candidate]() noexcept {
-            std::vector next_used {used};
-            next_used.at(candidate) = true;
-            return next_used;
-          }());
-          dfs_stack.emplace([&node, &candidate, &cost]() noexcept {
-            WorkingSolution next {node};
-            next.v_indices.at(candidate) = next.solution.path.size();
-            next.solution.path.emplace_back(candidate);
-            next.solution.cost += cost;
-            return next;
-          }());
-        }
-      }
-    }
+  const auto upper_bound_result {nn::run(matrix, graph_info)};
+  if (std::holds_alternative<tsp::ErrorAlgorithm>(upper_bound_result)) {
+    return std::get<tsp::ErrorAlgorithm>(upper_bound_result);
+  }
+  tsp::Solution upper_bound {std::get<tsp::Solution>(upper_bound_result)};
+  std::vector   indices {
+    std::vector(v_count, std::numeric_limits<size_t>::max())};
+  for (size_t v {0}; v < upper_bound.path.size() - 1; ++v) {
+    indices.at(upper_bound.path.at(v)) = v;
   }
 
-  return tsp::ErrorAlgorithm::NO_PATH;
+  return WorkingSolution {.v_indices = std::move(indices),
+                          .solution  = std::move(upper_bound)};
 }
 
 constexpr static void mark_tabu(tsp::Matrix<int>& tabu_matrix,
@@ -120,15 +68,15 @@ constexpr static int get_delta_cost(const tsp::Matrix<int>& matrix,
                                     int                     first_v,
                                     int                     second_v) noexcept {
   const size_t first_v_idx {current_solution.v_indices.at(first_v)};
-  const int    first_prev {
-    first_v_idx != 0
-       ? current_solution.solution.path.at(first_v_idx - 1)
-       : current_solution.solution.path.at(current_solution.solution.path.size() - 2)};
-  const int first_next {current_solution.solution.path.at(first_v_idx + 1)};
+  const int    first_prev {first_v_idx != 0
+                           ? current_solution.solution.path.at(first_v_idx - 1)
+                           : current_solution.solution.path.at(
+                          current_solution.solution.path.size() - 2)};
+  const int    first_next {current_solution.solution.path.at(first_v_idx + 1)};
 
   const size_t second_v_idx {current_solution.v_indices.at(second_v)};
-  const int    second_prev {current_solution.solution.path.at(second_v_idx - 1)};
-  const int    second_next {current_solution.solution.path.at(second_v_idx + 1)};
+  const int second_prev {current_solution.solution.path.at(second_v_idx - 1)};
+  const int second_next {current_solution.solution.path.at(second_v_idx + 1)};
 
   const int first_prev_old_cost {matrix.at(first_prev).at(first_v)};
   const int first_next_old_cost {matrix.at(first_v).at(first_next)};
@@ -212,7 +160,8 @@ constexpr static void perform_swap(WorkingSolution&     solution,
   const size_t first_v_idx {solution.v_indices.at(swap.first_v)};
   const size_t second_v_idx {solution.v_indices.at(swap.second_v)};
 
-  std::swap(solution.solution.path.at(first_v_idx), solution.solution.path.at(second_v_idx));
+  std::swap(solution.solution.path.at(first_v_idx),
+            solution.solution.path.at(second_v_idx));
   std::swap(solution.v_indices.at(swap.first_v),
             solution.v_indices.at(swap.second_v));
 
@@ -283,6 +232,7 @@ namespace ts {
 
 [[nodiscard]] std::variant<tsp::Solution, tsp::ErrorAlgorithm> run(
 const tsp::Matrix<int>& matrix,
+const tsp::GraphInfo&   graph_info,
 int                     itr_count,
 int                     no_improve_stop_itr_count,
 int                     tabu_itr_count) noexcept {
@@ -299,7 +249,8 @@ int                     tabu_itr_count) noexcept {
   }
 
   // check if path exists
-  const auto first_solution_result {impl::get_first_solution(matrix)};
+  const auto first_solution_result {
+    impl::get_first_solution(matrix, graph_info)};
   if (std::holds_alternative<tsp::ErrorAlgorithm>(first_solution_result)) {
     return std::get<tsp::ErrorAlgorithm>(first_solution_result);
   }

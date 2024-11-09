@@ -17,8 +17,8 @@ int main(int argc, const char** argv) {
   // }
   // const tsp::Arguments arg {std::get<tsp::Arguments>(arg_result)};
   const tsp::Arguments arg {
-    .algorithm   = tsp::Algorithm::TABU_SEARCH,
-    .config_file = "../../data/dr_mierzwa/configs/tsp_13.ini"};
+    .algorithm   = tsp::Algorithm::BXB_DFS,
+    .config_file = "../../data/dr_mierzwa/configs/tsp_10.ini"};
 
   const auto config_result {util::config::read(arg.config_file)};
   if (util::error::handle(config_result) == tsp::State::ERROR) {
@@ -52,12 +52,14 @@ int main(int argc, const char** argv) {
       case tsp::Algorithm::TABU_SEARCH:
         return util::measured_run(ts::run,
                                   config.matrix,
+                                  config.graph_info,
                                   config.params.tabu_search.itr,
                                   config.params.tabu_search.max_itr_no_improve,
                                   config.params.tabu_search.tabu_itr);
       case tsp::Algorithm::GENETIC:
         return util::measured_run(gen::run,
                                   config.matrix,
+                                  config.graph_info,
                                   config.params.genetic.itr,
                                   config.params.genetic.population_size,
                                   config.params.genetic.count_of_children,
