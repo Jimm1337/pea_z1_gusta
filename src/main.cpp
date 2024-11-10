@@ -63,7 +63,6 @@ int main(int argc, const char** argv) {
                                   config.params.genetic.itr,
                                   config.params.genetic.population_size,
                                   config.params.genetic.count_of_children,
-                                  config.params.genetic.crossovers_per_100,
                                   config.params.genetic.mutations_per_1000);
       default:
         std::terminate();

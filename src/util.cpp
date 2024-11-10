@@ -31,7 +31,6 @@ void help_page() noexcept {
   "itr = <integer iterations>\n"
   "population_size = <integer population after selection>\n"
   "count_of_children = <integer count of children per pair>\n"
-  "crossovers_per_100 = <integer percent of passed pairs to reproduce>\n"
   "mutations_per_1000 = <integer ppt of chromosomes to mutate before selection>\n\n"
   "- Example:\n\n"
   "[instance]\n"
@@ -51,7 +50,6 @@ void help_page() noexcept {
   "itr = 100000\n"
   "population_size = 50\n"
   "count_of_children = 8\n"
-  "crossovers_per_100 = 95\n"
   "mutations_per_1000 = 5\n\n");
 }
 
@@ -103,8 +101,6 @@ const std::filesystem::path& config_file) noexcept {
       static_cast<int>(reader.GetInteger("genetic", "population_size", -1)),
                     .count_of_children =
       static_cast<int>(reader.GetInteger("genetic", "count_of_children", -1)),
-                    .crossovers_per_100 =
-      static_cast<int>(reader.GetInteger("genetic", "crossovers_per_100", -1)),
                     .mutations_per_1000 = static_cast<int>(
       reader.GetInteger("genetic", "mutations_per_1000", -1))}
   };
@@ -266,8 +262,6 @@ void report(const tsp::Arguments& arguments,
       fmt::println("- Count of iterations: {}", params.genetic.itr);
       fmt::println("- Population size: {}", params.genetic.population_size);
       fmt::println("- Children per pair: {}", params.genetic.count_of_children);
-      fmt::println("- Crossover chance: {}%",
-                   params.genetic.crossovers_per_100);
       fmt::println("- Mutation chance: {:.1f}%\n",
                    static_cast<double>(params.genetic.mutations_per_1000) / 10);
       break;
