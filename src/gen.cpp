@@ -15,39 +15,35 @@ namespace gen::impl {
 class WorkingSolution {
 private:
   struct Allele {
-    std::vector<bool> used;
-    std::vector<int>  path;
-    int               cost;
+    std::vector<size_t> v_indices;
+    std::vector<int>    path;
+    int                 cost;
   };
 
-  std::vector<size_t> v_indices;
-  Allele              allele_first;
-  Allele              allele_last;
-  int                 first_last_v;
-  int                 first_last_v_cost;
-  int                 inter_allele_cost;
+  Allele allele_first;
+  Allele allele_last;
+  int    first_last_v;
+  int    first_last_v_cost;
+  int    inter_allele_cost;
 
 public:
   constexpr WorkingSolution(const tsp::Matrix<int>& matrix,
                             const tsp::Solution&    solution) noexcept:
-    v_indices {std::vector(solution.path.size() - 1,
-                           std::numeric_limits<size_t>::max())},
     first_last_v {solution.path.at(0)},
     allele_first {
-      .used = std::vector(solution.path.size() - 1, false),
+      .v_indices =
+      std::vector(solution.path.size() - 1, std::numeric_limits<size_t>::max()),
       .path = std::vector(solution.path.begin() + 1,
                           solution.path.begin() + (solution.path.size() / 2)),
       .cost = 0},
     allele_last {
-      .used = std::vector(solution.path.size() - 1, false),
+      .v_indices =
+      std::vector(solution.path.size() - 1, std::numeric_limits<size_t>::max()),
       .path = std::vector(solution.path.begin() + (solution.path.size() / 2),
                           solution.path.end() - 1),
       .cost = 0} {
-    v_indices.at(first_last_v) = 0;
-
     for (int v {0}; v < allele_first.path.size(); ++v) {
-      v_indices.at(allele_first.path.at(v))         = v + 1;
-      allele_first.used.at(allele_first.path.at(v)) = true;
+      allele_first.v_indices.at(allele_first.path.at(v)) = v;
 
       if (v != 0) [[likely]] {
         allele_first.cost +=
@@ -56,8 +52,7 @@ public:
     }
 
     for (int v {0}; v < allele_last.path.size(); ++v) {
-      v_indices.at(allele_last.path.at(v)) = v + allele_first.path.size() + 1;
-      allele_last.used.at(allele_last.path.at(v)) = true;
+      allele_last.v_indices.at(allele_last.path.at(v)) = v;
 
       if (v != 0) [[likely]] {
         allele_last.cost +=
@@ -105,8 +100,11 @@ public:
     return allele_last.path.at(idx - allele_first.path.size() - 1);
   }
 
-  [[nodiscard]] constexpr const size_t& idx(int v) const noexcept {
-    return v_indices.at(v);
+  [[nodiscard]] constexpr size_t idx(int v) const noexcept {
+    return v == first_last_v ? 0
+         : allele_first.v_indices.at(v) != std::numeric_limits<size_t>::max()
+         ? allele_first.v_indices.at(v) + 1
+         : allele_last.v_indices.at(v) + allele_first.path.size() + 1;
   }
 
   [[nodiscard]] constexpr size_t size() const noexcept {
@@ -121,7 +119,7 @@ public:
     return allele_last;
   }
 
-  [[nodiscard]] constexpr const int& begin_end() const noexcept {
+  [[nodiscard]] constexpr const int& first_last_vertex() const noexcept {
     return first_last_v;
   }
 
@@ -166,12 +164,14 @@ public:
       return false;
     }
 
-    const int v1_allele = first_v_idx == 0         ? 0
-                        : allele_first.used.at(v1) ? 1
-                                                   : 2;
-    const int v2_allele = second_v_idx == 0        ? 0
-                        : allele_first.used.at(v2) ? 1
-                                                   : 2;
+    const int v1_allele =
+    first_v_idx == 0                                                      ? 0
+    : allele_first.v_indices.at(v1) != std::numeric_limits<size_t>::max() ? 1
+                                                                          : 2;
+    const int v2_allele =
+    second_v_idx == 0                                                     ? 0
+    : allele_first.v_indices.at(v2) != std::numeric_limits<size_t>::max() ? 1
+                                                                          : 2;
 
     if (v1_allele == 0) {
       if (v2_allele == 1) {
@@ -183,8 +183,8 @@ public:
         } else {
           inter_allele_cost = first_next_new_cost;
         }
-        allele_first.used.at(v1)               = true;
-        allele_first.used.at(v2)               = false;
+        allele_first.v_indices.at(v1) = allele_first.v_indices.at(v2);
+        allele_first.v_indices.at(v2) = std::numeric_limits<size_t>::max();
       } else {
         if (v2 != allele_last.path.front()) {
           allele_last.cost += -second_prev_old_cost + first_prev_new_cost;
@@ -192,8 +192,8 @@ public:
         if (v2 != allele_last.path.back()) {
           allele_last.cost += -second_next_old_cost + first_next_new_cost;
         }
-        allele_last.used.at(v1)                                          = true;
-        allele_last.used.at(v2) = false;
+        allele_last.v_indices.at(v1) = allele_last.v_indices.at(v2);
+        allele_last.v_indices.at(v2) = std::numeric_limits<size_t>::max();
       }
       first_last_v_cost += -first_next_old_cost + -first_prev_old_cost +
                            second_next_new_cost + second_prev_new_cost;
@@ -207,8 +207,8 @@ public:
         } else {
           inter_allele_cost = second_next_new_cost;
         }
-        allele_first.used.at(v2)              = true;
-        allele_first.used.at(v1)              = false;
+        allele_first.v_indices.at(v2) = allele_first.v_indices.at(v1);
+        allele_first.v_indices.at(v1) = std::numeric_limits<size_t>::max();
       } else {
         if (v1 != allele_last.path.front()) {
           allele_last.cost += -first_prev_old_cost + second_prev_new_cost;
@@ -216,8 +216,8 @@ public:
         if (v1 != allele_last.path.back()) {
           allele_last.cost += -first_next_old_cost + second_next_new_cost;
         }
-        allele_last.used.at(v2)                                         = true;
-        allele_last.used.at(v1)                                         = false;
+        allele_last.v_indices.at(v2) = allele_last.v_indices.at(v1);
+        allele_last.v_indices.at(v1) = std::numeric_limits<size_t>::max();
       }
       first_last_v_cost += -second_next_old_cost + -second_prev_old_cost +
                            first_next_new_cost + first_prev_new_cost;
@@ -243,6 +243,7 @@ public:
         } else {
           inter_allele_cost = first_next_new_cost;
         }
+        std::swap(allele_first.v_indices.at(v1), allele_first.v_indices.at(v2));
       } else {
         if (v1 != allele_last.path.front()) {
           allele_last.cost += -first_prev_old_cost + second_prev_new_cost;
@@ -264,6 +265,7 @@ public:
         } else {
           first_last_v_cost += -second_next_old_cost + first_next_new_cost;
         }
+        std::swap(allele_last.v_indices.at(v1), allele_last.v_indices.at(v2));
       }
     } else {
       if (v1_allele == 1) {
@@ -287,10 +289,10 @@ public:
         } else {
           first_last_v_cost += -second_next_old_cost + first_next_new_cost;
         }
-        allele_first.used.at(v1) = false;
-        allele_first.used.at(v2) = true;
-        allele_last.used.at(v2)  = false;
-        allele_last.used.at(v1)  = true;
+        allele_first.v_indices.at(v2) = allele_first.v_indices.at(v1);
+        allele_first.v_indices.at(v1) = std::numeric_limits<size_t>::max();
+        allele_last.v_indices.at(v1)  = allele_last.v_indices.at(v2);
+        allele_last.v_indices.at(v2)  = std::numeric_limits<size_t>::max();
       } else {
         if (v1 != allele_last.path.front()) {
           allele_last.cost += -first_prev_old_cost + second_prev_new_cost;
@@ -312,20 +314,78 @@ public:
         } else {
           inter_allele_cost = first_next_new_cost;
         }
-        allele_first.used.at(v2) = false;
-        allele_first.used.at(v1) = true;
-        allele_last.used.at(v1)  = false;
-        allele_last.used.at(v2)  = true;
+        allele_first.v_indices.at(v1) = allele_first.v_indices.at(v2);
+        allele_first.v_indices.at(v2) = std::numeric_limits<size_t>::max();
+        allele_last.v_indices.at(v2)  = allele_last.v_indices.at(v1);
+        allele_last.v_indices.at(v1)  = std::numeric_limits<size_t>::max();
       }
     }
 
     std::swap(at(idx(v1)), at(idx(v2)));
-    std::swap(v_indices.at(v1), v_indices.at(v2));
 
     return true;
   }
 
+  [[nodiscard]] static constexpr std::optional<WorkingSolution> try_recombine(
+  const tsp::Matrix<int>& matrix,
+  const Allele&           first,
+  const Allele&           last,
+  int                     first_last_vertex) noexcept {
+    if (first.v_indices.at(first_last_vertex) !=
+        std::numeric_limits<size_t>::max() ||
+        last.v_indices.at(first_last_vertex) !=
+        std::numeric_limits<size_t>::max()) {
+      return std::nullopt;
+    }
+    for (int v {0}; v < first.v_indices.size(); ++v) {
+      if (first.v_indices.at(v) != std::numeric_limits<size_t>::max() &&
+          last.v_indices.at(v) != std::numeric_limits<size_t>::max()) {
+        return std::nullopt;
+      }
+    }
+    if (matrix.at(first_last_vertex).at(first.path.front()) == -1 ||
+        matrix.at(last.path.back()).at(first_last_vertex) == -1 ||
+        matrix.at(first.path.back()).at(last.path.front()) == -1) {
+      return std::nullopt;
+    }
+
+    return WorkingSolution {matrix, first, last, first_last_vertex};
+  }
+
+  [[nodiscard]] constexpr tsp::Solution to_solution() const noexcept {
+    const size_t size {allele_first.path.size() + allele_last.path.size() + 2};
+
+    tsp::Solution solution {.path =
+                            [&size]() noexcept {
+                              std::vector<int> path {};
+                              path.reserve(size);
+                              return path;
+                            }(),
+                            .cost = cost()};
+
+    solution.path.emplace_back(first_last_v);
+    const auto next_itr {
+      std::ranges::copy(allele_first.path, std::back_inserter(solution.path))
+      .out};
+    std::ranges::copy(allele_last.path, next_itr);
+    solution.path.emplace_back(first_last_v);
+
+    return solution;
+  }
+
 private:
+  constexpr WorkingSolution(const tsp::Matrix<int>& matrix,
+                            const Allele&           first,
+                            const Allele&           last,
+                            int                     first_last_vertex) noexcept:
+    allele_first {first},
+    allele_last {last},
+    first_last_v {first_last_vertex},
+    first_last_v_cost {matrix.at(first_last_vertex).at(first.path.front()) +
+                       matrix.at(last.path.back()).at(first_last_vertex)},
+    inter_allele_cost {matrix.at(first.path.back()).at(last.path.front())} {
+  }
+
   [[nodiscard]] constexpr int& at(size_t idx) noexcept {
     if (idx == 0 ||
         idx == 1 + allele_first.path.size() + allele_last.path.size()) {
