@@ -82,6 +82,7 @@ struct ParamGenetic {
   int itr;
   int population_size;
   int count_of_children;
+  int max_children_per_pair;
   int mutations_per_1000;
 };
 

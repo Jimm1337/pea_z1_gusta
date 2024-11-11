@@ -17,8 +17,8 @@ int main(int argc, const char** argv) {
   // }
   // const tsp::Arguments arg {std::get<tsp::Arguments>(arg_result)};
   const tsp::Arguments arg {
-    .algorithm   = tsp::Algorithm::BXB_DFS,
-    .config_file = "../../data/dr_mierzwa/configs/tsp_10.ini"};
+    .algorithm   = tsp::Algorithm::GENETIC,
+    .config_file = "../../data/dr_mierzwa/configs/tsp_20.ini"};
 
   const auto config_result {util::config::read(arg.config_file)};
   if (util::error::handle(config_result) == tsp::State::ERROR) {
@@ -63,6 +63,7 @@ int main(int argc, const char** argv) {
                                   config.params.genetic.itr,
                                   config.params.genetic.population_size,
                                   config.params.genetic.count_of_children,
+                                  config.params.genetic.max_children_per_pair,
                                   config.params.genetic.mutations_per_1000);
       default:
         std::terminate();

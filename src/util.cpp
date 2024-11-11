@@ -30,7 +30,8 @@ void help_page() noexcept {
   "[genetic]\n"
   "itr = <integer iterations>\n"
   "population_size = <integer population after selection>\n"
-  "count_of_children = <integer count of children per pair>\n"
+  "count_of_children = <integer count of all children in itr>\n"
+  "max_children_per_pair = <integer max children per pair (1 - 8)>\n"
   "mutations_per_1000 = <integer ppt of chromosomes to mutate before selection>\n\n"
   "- Example:\n\n"
   "[instance]\n"
@@ -49,7 +50,8 @@ void help_page() noexcept {
   "[genetic]\n"
   "itr = 100000\n"
   "population_size = 50\n"
-  "count_of_children = 8\n"
+  "count_of_children = 50\n"
+  "max_children_per_pair = 4\n"
   "mutations_per_1000 = 5\n\n");
 }
 
@@ -101,6 +103,8 @@ const std::filesystem::path& config_file) noexcept {
       static_cast<int>(reader.GetInteger("genetic", "population_size", -1)),
                     .count_of_children =
       static_cast<int>(reader.GetInteger("genetic", "count_of_children", -1)),
+                    .max_children_per_pair = static_cast<int>(
+      reader.GetInteger("genetic", "max_children_per_pair", -1)),
                     .mutations_per_1000 = static_cast<int>(
       reader.GetInteger("genetic", "mutations_per_1000", -1))}
   };
@@ -261,7 +265,10 @@ void report(const tsp::Arguments& arguments,
       fmt::println("Algorithm (Genetic)");
       fmt::println("- Count of iterations: {}", params.genetic.itr);
       fmt::println("- Population size: {}", params.genetic.population_size);
-      fmt::println("- Children per pair: {}", params.genetic.count_of_children);
+      fmt::println("- Children per iteration: {}",
+                   params.genetic.count_of_children);
+      fmt::println("- Maximum children per pair: {}",
+                   params.genetic.max_children_per_pair);
       fmt::println("- Mutation chance: {:.1f}%\n",
                    static_cast<double>(params.genetic.mutations_per_1000) / 10);
       break;

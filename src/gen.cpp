@@ -11,7 +11,6 @@
 //todo: implement
 
 namespace gen::impl {
-
 class WorkingSolution {
 private:
   struct Allele {
@@ -29,7 +28,6 @@ private:
 public:
   constexpr WorkingSolution(const tsp::Matrix<int>& matrix,
                             const tsp::Solution&    solution) noexcept:
-    first_last_v {solution.path.at(0)},
     allele_first {
       .v_indices =
       std::vector(solution.path.size() - 1, std::numeric_limits<size_t>::max()),
@@ -41,7 +39,8 @@ public:
       std::vector(solution.path.size() - 1, std::numeric_limits<size_t>::max()),
       .path = std::vector(solution.path.begin() + (solution.path.size() / 2),
                           solution.path.end() - 1),
-      .cost = 0} {
+      .cost = 0},
+    first_last_v {solution.path.at(0)} {
     for (int v {0}; v < allele_first.path.size(); ++v) {
       allele_first.v_indices.at(allele_first.path.at(v)) = v;
 
@@ -400,17 +399,6 @@ private:
 
 using Population = std::set<WorkingSolution, std::greater<>>;
 
-static std::variant<WorkingSolution, tsp::ErrorAlgorithm> get_first_solution(
-const tsp::Matrix<int>& matrix,
-const tsp::GraphInfo&   graph_info) noexcept {
-  const auto upper_bound_result {nn::run(matrix, graph_info)};
-  if (std::holds_alternative<tsp::ErrorAlgorithm>(upper_bound_result)) {
-    return std::get<tsp::ErrorAlgorithm>(upper_bound_result);
-  }
-
-  return WorkingSolution {matrix, std::get<tsp::Solution>(upper_bound_result)};
-}
-
 [[nodiscard]] static std::variant<Population, tsp::ErrorAlgorithm>
 init_population(const tsp::Matrix<int>& matrix,
                 const tsp::GraphInfo&   graph_info,
@@ -420,7 +408,7 @@ init_population(const tsp::Matrix<int>& matrix,
   const int    max_retries {static_cast<int>(v_count) * population_size * 100};
   int          retries {0};
 
-  const auto first_sol_result {get_first_solution(matrix, graph_info)};
+  const auto first_sol_result {nn::run(matrix, graph_info)};
   if (std::holds_alternative<tsp::ErrorAlgorithm>(first_sol_result)) {
     return std::get<tsp::ErrorAlgorithm>(first_sol_result);
   }
@@ -430,7 +418,7 @@ init_population(const tsp::Matrix<int>& matrix,
   std::uniform_int_distribution distribution {};
 
   while (new_population.size() != population_size) {
-    WorkingSolution next {std::get<WorkingSolution>(first_sol_result)};
+    WorkingSolution next {matrix, std::get<tsp::Solution>(first_sol_result)};
 
     for (int i {static_cast<int>(next.size() - 1)}; i > 0; --i) {
       while (
@@ -504,14 +492,108 @@ static void mutate(const tsp::Matrix<int>& matrix,
   }
 }
 
-static Population select_and_reproduce(tsp::Matrix<int>& matrix,
-                                       Population&       population,
-                                       std::mt19937_64&  rand_src,
-                                       int               count_of_children,
-                                       int crossovers_per_100) noexcept {
-  const size_t population_size {population.size()};
+static void reproduce(const tsp::Matrix<int>& matrix,
+                      Population&             population,
+                      int                     count_of_children,
+                      int                     max_children_per_pair) noexcept {
+  const size_t     population_size {population.size()};
+  const Population reproducing {population};
 
-  //todo: reproduce, cut up to pop size
+  auto first_p_it {reproducing.begin()};
+  auto second_p_it {std::next(first_p_it)};
+
+  while (population.size() != population_size + count_of_children &&
+         second_p_it != reproducing.end()) {
+    std::vector potential_children {
+      {WorkingSolution::try_recombine(matrix,
+       first_p_it->first_allele(),
+       second_p_it->second_allele(),
+       first_p_it->first_last_vertex()),
+       WorkingSolution::try_recombine(matrix,
+       first_p_it->first_allele(),
+       second_p_it->second_allele(),
+       second_p_it->first_last_vertex()),
+       WorkingSolution::try_recombine(matrix,
+       first_p_it->first_allele(),
+       second_p_it->second_allele(),
+       second_p_it->first_last_vertex()),
+       WorkingSolution::try_recombine(matrix,
+       first_p_it->second_allele(),
+       second_p_it->first_allele(),
+       second_p_it->first_last_vertex()),
+       WorkingSolution::try_recombine(matrix,
+       second_p_it->first_allele(),
+       first_p_it->second_allele(),
+       first_p_it->first_last_vertex()),
+       WorkingSolution::try_recombine(matrix,
+       second_p_it->first_allele(),
+       first_p_it->second_allele(),
+       second_p_it->first_last_vertex()),
+       WorkingSolution::try_recombine(matrix,
+       second_p_it->second_allele(),
+       first_p_it->first_allele(),
+       first_p_it->first_last_vertex()),
+       WorkingSolution::try_recombine(matrix,
+       second_p_it->second_allele(),
+       first_p_it->first_allele(),
+       second_p_it->first_last_vertex())}
+    };
+
+    if (max_children_per_pair < potential_children.size()) {
+      std::ranges::sort(potential_children,
+                        std::greater {},
+                        [](const auto& potential_child) noexcept {
+                          return potential_child.has_value()
+                               ? potential_child->cost()
+                               : std::numeric_limits<int>::max();
+                        });
+    }
+
+    for (int child {0};
+         child < std::min(max_children_per_pair,
+                          static_cast<int>(potential_children.size()));
+         ++child) {
+      if (potential_children.at(child).has_value()) {
+        population.emplace(std::move(*potential_children.at(child)));
+      }
+    }
+
+    ++first_p_it;
+    ++second_p_it;
+  }
+}
+
+static void cut(Population& population, int target_size) noexcept {
+  population.erase(
+  std::ranges::next(population.begin(), target_size, population.end()),
+  population.end());
+}
+
+static std::variant<tsp::Solution, tsp::ErrorAlgorithm> algorithm(
+const tsp::Matrix<int>& matrix,
+const tsp::GraphInfo&   graph_info,
+int                     count_of_itr,
+int                     population_size,
+int                     count_of_children,
+int                     max_children_per_pair,
+int                     mutations_per_1000) noexcept {
+  std::mt19937_64 rand_src {std::random_device {}()};
+
+  auto population_result {
+    init_population(matrix, graph_info, rand_src, population_size)};
+  if (std::holds_alternative<tsp::ErrorAlgorithm>(population_result))
+  [[unlikely]] {
+    return std::get<tsp::ErrorAlgorithm>(population_result);
+  }
+  Population population {std::move(std::get<Population>(population_result))};
+
+  for (int itr {0}; itr < count_of_itr; ++itr) {
+    reproduce(matrix, population, count_of_children, max_children_per_pair);
+    mutate(matrix, population, rand_src, mutations_per_1000);
+    cut(population, population_size);
+  }
+
+  return population.begin()->to_solution();
 }
 
 }    // namespace gen::impl
@@ -524,8 +606,33 @@ const tsp::GraphInfo&   graph_info,
 int                     count_of_itr,
 int                     population_size,
 int                     count_of_children,
+int                     max_children_per_pair,
 int                     mutations_per_1000) noexcept {
-  return tsp::ErrorAlgorithm::NO_PATH;
+  if (count_of_itr < 1 || population_size < 2 || count_of_children < 1 ||
+      max_children_per_pair < 1 || mutations_per_1000 < 0 ||
+      mutations_per_1000 > 1000) [[unlikely]] {
+    return tsp::ErrorAlgorithm::INVALID_PARAM;
+  }
+
+  if (matrix.empty()) [[unlikely]] {
+    return tsp::ErrorAlgorithm::NO_PATH;
+  }
+
+  if (matrix.size() == 1) [[unlikely]] {
+    return tsp::Solution{.path = {0}, .cost = 0};
+  }
+
+  if (matrix.size() == 2) [[unlikely]] {
+    return nn::run(matrix, graph_info);
+  }
+
+  return impl::algorithm(matrix,
+                         graph_info,
+                         count_of_itr,
+                         population_size,
+                         count_of_children,
+                         max_children_per_pair,
+                         mutations_per_1000);
 }
 
 }    // namespace gen
