@@ -397,7 +397,7 @@ private:
   }
 };
 
-using Population = std::set<WorkingSolution, std::greater<>>;
+using Population = std::set<WorkingSolution>;
 
 [[nodiscard]] static std::variant<Population, tsp::ErrorAlgorithm>
 init_population(const tsp::Matrix<int>& matrix,
@@ -443,51 +443,33 @@ static void mutate(const tsp::Matrix<int>& matrix,
                    Population&             population,
                    std::mt19937_64&        rand_src,
                    int                     mutations_per_1000) noexcept {
-  const size_t v_count {matrix.size()};
-  const int    max_retries {static_cast<int>(v_count * 10)};
-
-  std::uniform_int_distribution<> chance_distribution {0, 1000};
-  std::uniform_int_distribution<> swap_distribution {};
+  std::uniform_int_distribution chance_distribution {0, 1000};
+  std::uniform_int_distribution swap_distribution {};
 
   for (int i {0}; i < population.size(); ++i) {
+    const WorkingSolution old_node {
+      population
+      .extract(
+      std::ranges::next(population.begin(), i, std::prev(population.end())))
+      .value()};
+    WorkingSolution node {old_node};
+
     if (chance_distribution(rand_src) < mutations_per_1000) {
-      int retries {0};
-      int second_v {
-        swap_distribution(rand_src,
-                          std::uniform_int_distribution<>::param_type {
-                            1,
-                            static_cast<int>(v_count - 1)})};
-      int first_v {swap_distribution(
-      rand_src,
-      std::uniform_int_distribution<>::param_type {0, second_v - 1})};
-
-      const WorkingSolution old_node {
-        population
-        .extract(
-        std::ranges::next(population.begin(), i, std::prev(population.end())))
-        .value()};
-      WorkingSolution node {old_node};
-
-      while (!node.try_swap_v(matrix, first_v, second_v)) [[unlikely]] {
-        if (++retries > max_retries) [[unlikely]] {
+      for (int v {static_cast<int>(node.size() - 1)}; v > 0; --v) {
+        if (node.try_swap_v(matrix,
+                            node.at_c(swap_distribution(
+                            rand_src,
+                            std::uniform_int_distribution<>::param_type(0, v))),
+                            node.at_c(v))) {
           break;
         }
-
-        second_v =
-        swap_distribution(rand_src,
-                          std::uniform_int_distribution<>::param_type {
-                            1,
-                            static_cast<int>(v_count - 1)});
-        first_v = swap_distribution(
-        rand_src,
-        std::uniform_int_distribution<>::param_type {0, second_v - 1});
       }
+    }
 
-      if (population.contains(node)) [[unlikely]] {
-        population.emplace(old_node);
-      } else [[likely]] {
-        population.emplace(node);
-      }
+    if (population.contains(node)) [[unlikely]] {
+      population.emplace(old_node);
+    } else [[likely]] {
+      population.emplace(node);
     }
   }
 }
@@ -619,7 +601,7 @@ int                     mutations_per_1000) noexcept {
   }
 
   if (matrix.size() == 1) [[unlikely]] {
-    return tsp::Solution{.path = {0}, .cost = 0};
+    return tsp::Solution {.path = {0}, .cost = 0};
   }
 
   if (matrix.size() == 2) [[unlikely]] {
