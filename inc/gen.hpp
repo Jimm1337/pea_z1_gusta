@@ -7,6 +7,7 @@ namespace gen {
 [[nodiscard]] std::variant<tsp::Solution, tsp::ErrorAlgorithm> run(
 const tsp::Matrix<int>& matrix,
 const tsp::GraphInfo&   graph_info,
+const std::optional<int>&      optimal_cost,
 int                     count_of_itr,
 int                     population_size,
 int                     count_of_children,

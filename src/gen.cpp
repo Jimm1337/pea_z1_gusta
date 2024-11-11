@@ -400,15 +400,16 @@ private:
 using Population = std::set<WorkingSolution>;
 
 [[nodiscard]] static std::variant<Population, tsp::ErrorAlgorithm>
-init_population(const tsp::Matrix<int>& matrix,
-                const tsp::GraphInfo&   graph_info,
-                std::mt19937_64&        rand_src,
-                int                     population_size) noexcept {
+init_population(const tsp::Matrix<int>&   matrix,
+                const tsp::GraphInfo&     graph_info,
+                const std::optional<int>& optimal_cost,
+                std::mt19937_64&          rand_src,
+                int                       population_size) noexcept {
   const size_t v_count {matrix.size()};
   const int    max_retries {static_cast<int>(v_count) * population_size * 100};
   int          retries {0};
 
-  const auto first_sol_result {nn::run(matrix, graph_info)};
+  const auto first_sol_result {nn::run(matrix, graph_info, optimal_cost)};
   if (std::holds_alternative<tsp::ErrorAlgorithm>(first_sol_result)) {
     return std::get<tsp::ErrorAlgorithm>(first_sol_result);
   }
@@ -552,17 +553,21 @@ static void cut(Population& population, int target_size) noexcept {
 }
 
 static std::variant<tsp::Solution, tsp::ErrorAlgorithm> algorithm(
-const tsp::Matrix<int>& matrix,
-const tsp::GraphInfo&   graph_info,
-int                     count_of_itr,
-int                     population_size,
-int                     count_of_children,
-int                     max_children_per_pair,
-int                     mutations_per_1000) noexcept {
+const tsp::Matrix<int>&   matrix,
+const tsp::GraphInfo&     graph_info,
+const std::optional<int>& optimal_cost,
+int                       count_of_itr,
+int                       population_size,
+int                       count_of_children,
+int                       max_children_per_pair,
+int                       mutations_per_1000) noexcept {
   std::mt19937_64 rand_src {std::random_device {}()};
 
-  auto population_result {
-    init_population(matrix, graph_info, rand_src, population_size)};
+  auto population_result {init_population(matrix,
+                                          graph_info,
+                                          optimal_cost,
+                                          rand_src,
+                                          population_size)};
   if (std::holds_alternative<tsp::ErrorAlgorithm>(population_result))
   [[unlikely]] {
     return std::get<tsp::ErrorAlgorithm>(population_result);
@@ -571,7 +576,20 @@ int                     mutations_per_1000) noexcept {
 
   for (int itr {0}; itr < count_of_itr; ++itr) {
     reproduce(matrix, population, count_of_children, max_children_per_pair);
+    if (optimal_cost.has_value()) {
+      const tsp::Solution best_after_reproduce {
+        population.begin()->to_solution()};
+      if (*optimal_cost == best_after_reproduce.cost) {
+        return best_after_reproduce;
+      }
+    }
     mutate(matrix, population, rand_src, mutations_per_1000);
+    if (optimal_cost.has_value()) {
+      const tsp::Solution best_after_mutate {population.begin()->to_solution()};
+      if (*optimal_cost == best_after_mutate.cost) {
+        return best_after_mutate;
+      }
+    }
     cut(population, population_size);
   }
 
@@ -583,13 +601,14 @@ int                     mutations_per_1000) noexcept {
 namespace gen {
 
 [[nodiscard]] std::variant<tsp::Solution, tsp::ErrorAlgorithm> run(
-const tsp::Matrix<int>& matrix,
-const tsp::GraphInfo&   graph_info,
-int                     count_of_itr,
-int                     population_size,
-int                     count_of_children,
-int                     max_children_per_pair,
-int                     mutations_per_1000) noexcept {
+const tsp::Matrix<int>&   matrix,
+const tsp::GraphInfo&     graph_info,
+const std::optional<int>& optimal_cost,
+int                       count_of_itr,
+int                       population_size,
+int                       count_of_children,
+int                       max_children_per_pair,
+int                       mutations_per_1000) noexcept {
   if (count_of_itr < 1 || population_size < 2 || count_of_children < 1 ||
       max_children_per_pair < 1 || mutations_per_1000 < 0 ||
       mutations_per_1000 > 1000) [[unlikely]] {
@@ -605,11 +624,12 @@ int                     mutations_per_1000) noexcept {
   }
 
   if (matrix.size() == 2) [[unlikely]] {
-    return nn::run(matrix, graph_info);
+    return nn::run(matrix, graph_info, optimal_cost);
   }
 
   return impl::algorithm(matrix,
                          graph_info,
+                         optimal_cost,
                          count_of_itr,
                          population_size,
                          count_of_children,

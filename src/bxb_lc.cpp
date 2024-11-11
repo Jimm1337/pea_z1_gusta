@@ -1,6 +1,6 @@
 #include "bxb.hpp"
-#include "util.hpp"
 #include "nn.hpp"
+#include "util.hpp"
 
 #include <cstddef>
 #include <limits>
@@ -94,8 +94,9 @@ static void algorithm(const tsp::Matrix<int>& matrix,
 namespace bxb::lc {
 
 [[nodiscard]] std::variant<tsp::Solution, tsp::ErrorAlgorithm> run(
-const tsp::Matrix<int>& matrix,
-const tsp::GraphInfo&   graph_info) noexcept {
+const tsp::Matrix<int>&   matrix,
+const tsp::GraphInfo&     graph_info,
+const std::optional<int>& optimal_cost) noexcept {
   const size_t v_count {matrix.size()};
 
   if (v_count == 1) [[unlikely]] {    //edge case: 1 vertex
@@ -103,7 +104,7 @@ const tsp::GraphInfo&   graph_info) noexcept {
   }
 
   // upper bound = nn solution
-  const auto upper_bound_result{nn::run(matrix, graph_info)};
+  const auto upper_bound_result {nn::run(matrix, graph_info, optimal_cost)};
   if (std::holds_alternative<tsp::ErrorAlgorithm>(upper_bound_result)) {
     return upper_bound_result;
   }
@@ -114,6 +115,9 @@ const tsp::GraphInfo&   graph_info) noexcept {
   } else {
     for (int vertex {0}; vertex < v_count; ++vertex) {
       impl::algorithm(matrix, best, vertex);
+      if (optimal_cost.has_value() && best.cost == *optimal_cost) {
+        break;
+      }
     }
   }
 

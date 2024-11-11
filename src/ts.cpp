@@ -22,10 +22,11 @@ struct SwapCandidate {
 
 static std::variant<WorkingSolution, tsp::ErrorAlgorithm> get_first_solution(
 const tsp::Matrix<int>& matrix,
-const tsp::GraphInfo&   graph_info) noexcept {
+const tsp::GraphInfo&   graph_info,
+std::optional<int>      optimal_cost) noexcept {
   const size_t v_count {matrix.size()};
 
-  const auto upper_bound_result {nn::run(matrix, graph_info)};
+  const auto upper_bound_result {nn::run(matrix, graph_info, optimal_cost)};
   if (std::holds_alternative<tsp::ErrorAlgorithm>(upper_bound_result)) {
     return std::get<tsp::ErrorAlgorithm>(upper_bound_result);
   }
@@ -176,16 +177,21 @@ template<typename WorkingSolutionType, typename TabuMatrixType>
 requires std::is_same_v<std::remove_cvref_t<WorkingSolutionType>,
                         WorkingSolution> &&
          std::is_same_v<std::remove_cvref_t<TabuMatrixType>, tsp::Matrix<int>>
-static tsp::Solution algorithm(const tsp::Matrix<int>& matrix,
-                               TabuMatrixType&&        tabu_matrix_in,
-                               WorkingSolutionType&&   starting_solution,
-                               int                     itr_count,
+static tsp::Solution algorithm(const tsp::Matrix<int>&   matrix,
+                               const std::optional<int>& optimal_cost,
+                               TabuMatrixType&&          tabu_matrix_in,
+                               WorkingSolutionType&&     starting_solution,
+                               int                       itr_count,
                                int no_improve_stop_itr_count,
                                int tabu_itr_count) noexcept {
   tsp::Matrix<int> tabu_matrix {std::forward<TabuMatrixType>(tabu_matrix_in)};
   WorkingSolution  work {std::forward<WorkingSolutionType>(starting_solution)};
   tsp::Solution    best {work.solution};
   int              no_improve_itr_count {0};
+
+  if (optimal_cost.has_value() && best.cost == *optimal_cost) {
+    return best;
+  }
 
   for (int itr {0}; itr < itr_count; ++itr) {
     const SwapCandidate best_candidate {
@@ -216,6 +222,9 @@ static tsp::Solution algorithm(const tsp::Matrix<int>& matrix,
 
         if (work.solution.cost < best.cost) {
           best = work.solution;
+          if (optimal_cost.has_value() && best.cost == *optimal_cost) {
+            return best;
+          }
         }
       }
     }
@@ -231,11 +240,12 @@ static tsp::Solution algorithm(const tsp::Matrix<int>& matrix,
 namespace ts {
 
 [[nodiscard]] std::variant<tsp::Solution, tsp::ErrorAlgorithm> run(
-const tsp::Matrix<int>& matrix,
-const tsp::GraphInfo&   graph_info,
-int                     itr_count,
-int                     no_improve_stop_itr_count,
-int                     tabu_itr_count) noexcept {
+const tsp::Matrix<int>&   matrix,
+const tsp::GraphInfo&     graph_info,
+const std::optional<int>& optimal_cost,
+int                       itr_count,
+int                       no_improve_stop_itr_count,
+int                       tabu_itr_count) noexcept {
   const size_t v_count {matrix.size()};
 
   // param check
@@ -250,12 +260,13 @@ int                     tabu_itr_count) noexcept {
 
   // check if path exists
   const auto first_solution_result {
-    impl::get_first_solution(matrix, graph_info)};
+    impl::get_first_solution(matrix, graph_info, optimal_cost)};
   if (std::holds_alternative<tsp::ErrorAlgorithm>(first_solution_result)) {
     return std::get<tsp::ErrorAlgorithm>(first_solution_result);
   }
 
   return impl::algorithm(matrix,
+                         optimal_cost,
                          std::vector(v_count, std::vector(v_count, 0)),
                          std::get<impl::WorkingSolution>(first_solution_result),
                          itr_count,

@@ -92,8 +92,9 @@ constexpr static void algorithm(const tsp::Matrix<int>& matrix,
 namespace random {
 
 [[nodiscard]] std::variant<tsp::Solution, tsp::ErrorAlgorithm> run(
-const tsp::Matrix<int>& matrix,
-const int               time_ms) noexcept {
+const tsp::Matrix<int>&   matrix,
+const std::optional<int>& optimal_cost,
+const int                 time_ms) noexcept {
   const auto start {std::chrono::high_resolution_clock::now()};
 
   if (time_ms < 1) {
@@ -116,12 +117,15 @@ const int               time_ms) noexcept {
 
   // run for specified time
   while (true) {
-    const tsp::Time elapsed{std::chrono::high_resolution_clock::now() - start};
+    const tsp::Time elapsed {std::chrono::high_resolution_clock::now() - start};
     if (elapsed.count() > time_ms) {
       break;
     }
 
     impl::algorithm(matrix, random_source, best);
+    if (optimal_cost.has_value() && *optimal_cost == best.cost) {
+      break;
+    }
   }
 
   if (best.cost == std::numeric_limits<int>::max()) [[unlikely]] {

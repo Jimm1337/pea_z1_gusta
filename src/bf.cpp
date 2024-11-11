@@ -24,19 +24,18 @@ static void algorithm(const tsp::Matrix<int>& matrix,
   const size_t v_count {matrix.size()};
 
   // potential paths to be processed
-  std::queue<WorkingSolution> queue {{WorkingSolution {
-    .used_vertices =
-    [&starting_vertex, &v_count]() noexcept {
-      std::vector<bool> used {};
-      used.resize(v_count, false);
-      used.at(starting_vertex) = true;
-      return used;         }
-    (),
- .solution = { .path = {starting_vertex}, .cost = 0}
-  }}};
+  std::queue<WorkingSolution> queue {
+    {WorkingSolution {.used_vertices =
+                      [&starting_vertex, &v_count]() noexcept {
+                        std::vector<bool> used {};
+                        used.resize(v_count, false);
+                        used.at(starting_vertex) = true;
+                        return used;
+                      }(),
+                      .solution = {.path = {starting_vertex}, .cost = 0}}}};
 
   while (!queue.empty()) [[likely]] {
-    WorkingSolution current{std::move(queue.front())};
+    WorkingSolution current {std::move(queue.front())};
     queue.pop();
 
     const int current_v {current.solution.path.back()};
@@ -57,10 +56,10 @@ static void algorithm(const tsp::Matrix<int>& matrix,
       for (int vertex {0}; vertex < v_count; ++vertex) {
         const bool used {current.used_vertices.at(vertex)};
 
-        if (const int cost {matrix.at(current_v).at(vertex)}; !used && cost != -1)
-          [[likely]] {
-            options.emplace_back(Candidate {.vertex = vertex, .cost = cost});
-          }
+        if (const int cost {matrix.at(current_v).at(vertex)};
+            !used && cost != -1) [[likely]] {
+          options.emplace_back(Candidate {.vertex = vertex, .cost = cost});
+        }
       }
 
       // add next paths to be processed for every valid option
@@ -82,7 +81,9 @@ static void algorithm(const tsp::Matrix<int>& matrix,
 namespace bf {
 
 [[nodiscard]] std::variant<tsp::Solution, tsp::ErrorAlgorithm> run(
-const tsp::Matrix<int>& matrix, const tsp::GraphInfo& graph_info) noexcept {
+const tsp::Matrix<int>&   matrix,
+const tsp::GraphInfo&     graph_info,
+const std::optional<int>& optimal_cost) noexcept {
   const size_t v_count {matrix.size()};
 
   if (v_count == 1) [[unlikely]] {    //edge case: 1 vertex
@@ -96,6 +97,9 @@ const tsp::Matrix<int>& matrix, const tsp::GraphInfo& graph_info) noexcept {
   } else {
     for (int vertex {0}; vertex < v_count; ++vertex) {
       impl::algorithm(matrix, best, vertex);
+      if (optimal_cost.has_value() && *optimal_cost == best.cost) {
+        break;
+      }
     }
   }
 
