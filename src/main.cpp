@@ -18,7 +18,7 @@ int main(int argc, const char** argv) {
   // const tsp::Arguments arg {std::get<tsp::Arguments>(arg_result)};
   const tsp::Arguments arg {
     .algorithm   = tsp::Algorithm::TABU_SEARCH,
-    .config_file = "../../data/tsplib_tsp/configs/14_burma14.ini"};
+    .config_file = "../../data/tsplib_tsp/configs/229_gr229.ini"};
 
   const auto config_result {util::config::read(arg.config_file)};
   if (util::error::handle(config_result) == tsp::State::ERROR) {
@@ -33,57 +33,45 @@ int main(int argc, const char** argv) {
     "[W] Could not set task priority to HIGH. Timing may be inconsistent.");
   }
 
-  const auto timed_result {[&arg, &config]() noexcept {
+  const std::optional optimal_cost {config.optimal.cost != -1
+                                    ? std::optional {config.optimal.cost}
+                                    : std::nullopt};
+
+  const auto timed_result {[&arg, &config, &optimal_cost]() noexcept {
     switch (arg.algorithm) {
       case tsp::Algorithm::BRUTE_FORCE:
-        return util::measured_run(bf::run,
-                                  config.matrix,
-                                  config.graph_info,
-                                  config.optimal.cost != -1
-                                  ? std::optional {config.optimal.cost}
-                                  : std::nullopt);
+        return util::measured_run(bf::run, config.matrix, config.graph_info, optimal_cost);
       case tsp::Algorithm::NEAREST_NEIGHBOUR:
         return util::measured_run(nn::run,
                                   config.matrix,
                                   config.graph_info,
-                                  config.optimal.cost != -1
-                                  ? std::optional {config.optimal.cost}
-                                  : std::nullopt);
+                                  optimal_cost);
       case tsp::Algorithm::RANDOM:
         return util::measured_run(random::run,
                                   config.matrix,
-                                  config.optimal.cost != -1
-                                  ? std::optional {config.optimal.cost}
-                                  : std::nullopt,
+                                  config.graph_info,
+                                  optimal_cost,
                                   config.params.random.millis);
       case tsp::Algorithm::BXB_LEAST_COST:
         return util::measured_run(bxb::lc::run,
                                   config.matrix,
                                   config.graph_info,
-                                  config.optimal.cost != -1
-                                  ? std::optional {config.optimal.cost}
-                                  : std::nullopt);
+                                  optimal_cost);
       case tsp::Algorithm::BXB_BFS:
         return util::measured_run(bxb::bfs::run,
                                   config.matrix,
                                   config.graph_info,
-                                  config.optimal.cost != -1
-                                  ? std::optional {config.optimal.cost}
-                                  : std::nullopt);
+                                  optimal_cost);
       case tsp::Algorithm::BXB_DFS:
         return util::measured_run(bxb::dfs::run,
                                   config.matrix,
                                   config.graph_info,
-                                  config.optimal.cost != -1
-                                  ? std::optional {config.optimal.cost}
-                                  : std::nullopt);
+                                  optimal_cost);
       case tsp::Algorithm::TABU_SEARCH:
         return util::measured_run(ts::run,
                                   config.matrix,
                                   config.graph_info,
-                                  config.optimal.cost != -1
-                                  ? std::optional {config.optimal.cost}
-                                  : std::nullopt,
+                                  optimal_cost,
                                   config.params.tabu_search.itr,
                                   config.params.tabu_search.max_itr_no_improve,
                                   config.params.tabu_search.tabu_itr);
@@ -91,9 +79,7 @@ int main(int argc, const char** argv) {
         return util::measured_run(gen::run,
                                   config.matrix,
                                   config.graph_info,
-                                  config.optimal.cost != -1
-                                  ? std::optional {config.optimal.cost}
-                                  : std::nullopt,
+                                  optimal_cost,
                                   config.params.genetic.itr,
                                   config.params.genetic.population_size,
                                   config.params.genetic.count_of_children,

@@ -22,6 +22,7 @@ struct RandomSource {
 constexpr static int NUMBER_OF_RETRIES {1'0000};
 
 constexpr static void algorithm(const tsp::Matrix<int>& matrix,
+                                const tsp::GraphInfo&   graph_info,
                                 RandomSource&           random_source,
                                 tsp::Solution&          current_best) noexcept {
   const size_t v_count {matrix.size()};
@@ -37,17 +38,19 @@ constexpr static void algorithm(const tsp::Matrix<int>& matrix,
   while (work.solution.path.size() != v_count) [[likely]] {
     const size_t starting_size {work.solution.path.size()};
 
-    // check if path exists
-    bool has_path {false};
-    for (int vertex {0}; vertex < v_count; ++vertex) {
-      if (matrix.at(work.solution.path.back()).at(vertex) != -1) [[likely]] {
-        has_path = true;
-        break;
+    if (!graph_info.full_graph) {
+      // check if path exists
+      bool has_path {false};
+      for (int vertex {0}; vertex < v_count; ++vertex) {
+        if (matrix.at(work.solution.path.back()).at(vertex) != -1) [[likely]] {
+          has_path = true;
+          break;
+        }
       }
-    }
 
-    if (!has_path) [[unlikely]] {
-      return;
+      if (!has_path) [[unlikely]] {
+        return;
+      }
     }
 
     // while did not rand valid vertex generate, then add valid random vertex
@@ -70,10 +73,12 @@ constexpr static void algorithm(const tsp::Matrix<int>& matrix,
     }
   }
 
-  // edge case: no path from last to beginning
-  if (matrix.at(work.solution.path.back()).at(work.solution.path.front()) == -1)
-  [[unlikely]] {
-    return;
+  if (!graph_info.full_graph) {
+    // edge case: no path from last to beginning
+    if (matrix.at(work.solution.path.back()).at(work.solution.path.front()) == -1)
+      [[unlikely]] {
+        return;
+      }
   }
 
   // add cost to travel to beginning from last
@@ -93,6 +98,7 @@ namespace random {
 
 [[nodiscard]] std::variant<tsp::Solution, tsp::ErrorAlgorithm> run(
 const tsp::Matrix<int>&   matrix,
+const tsp::GraphInfo&     graph_info,
 const std::optional<int>& optimal_cost,
 const int                 time_ms) noexcept {
   const auto start {std::chrono::high_resolution_clock::now()};
@@ -122,7 +128,7 @@ const int                 time_ms) noexcept {
       break;
     }
 
-    impl::algorithm(matrix, random_source, best);
+    impl::algorithm(matrix, graph_info, random_source, best);
     if (optimal_cost.has_value() && *optimal_cost == best.cost) {
       break;
     }

@@ -191,7 +191,7 @@ void report(const tsp::Arguments& arguments,
                optimal_solution,
                params,
                graph_info] {instance};
-  const auto& [solution, time] {result};
+  const auto& [solution, time, error_info] {result};
   const auto [count, unit] {parse_duration(time)};
 
   const bool optimized {graph_info.full_graph && graph_info.symmetric_graph};
@@ -285,7 +285,12 @@ void report(const tsp::Arguments& arguments,
     for (const auto& node : solution.path) {
       fmt::print("{} ", node);
     }
-    fmt::println("\n");
+    fmt::println("");
+  }
+  if (error_info.has_value()) {
+    fmt::println("");
+    fmt::println("Absolute error: {}", error_info->absolute);
+    fmt::println("Relative error: {:.2f}%", error_info->relative_percent);
   }
 }
 

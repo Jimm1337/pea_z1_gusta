@@ -106,9 +106,15 @@ struct Instance {
   GraphInfo             graph_info;
 };
 
+struct Error {
+  int    absolute;
+  double relative_percent;
+};
+
 struct Result {
-  Solution solution;
-  Time     time;
+  Solution             solution;
+  Time                 time;
+  std::optional<Error> error_info;
 };
 
 struct Duration {
@@ -266,25 +272,37 @@ tsp::State handle(const std::variant<Ret, Error>& result) noexcept {
 namespace util {
 
 template<typename Func, typename... Params>
-requires std::invocable<Func, Params...> &&
-         std::is_same_v<std::invoke_result_t<Func, Params...>,
+requires std::invocable<Func, const tsp::Matrix<int>&, const tsp::GraphInfo&, const std::optional<int>&, Params...> &&
+         std::is_same_v<std::invoke_result_t<Func, const tsp::Matrix<int>&, const tsp::GraphInfo&, const std::optional<int>&, Params...>,
                         std::variant<tsp::Solution, tsp::ErrorAlgorithm>>
 [[nodiscard]] std::variant<tsp::Result, tsp::ErrorAlgorithm> measured_run(
-Func algorithm,
+Func                      algorithm,
+const tsp::Matrix<int>& matrix,
+const tsp::GraphInfo&   graph_info,
+const std::optional<int>&      optimal_cost,
 Params&&... params) noexcept {
   const auto start {std::chrono::high_resolution_clock::now()};
 
-  const std::variant<tsp::Solution, tsp::ErrorAlgorithm> solution {
-    algorithm(std::forward<Params>(params)...)};
+  const std::variant<tsp::Solution, tsp::ErrorAlgorithm> solution_result {
+    algorithm(matrix, graph_info, optimal_cost, std::forward<Params>(params)...)};
 
   const auto end {std::chrono::high_resolution_clock::now()};
 
-  if (std::holds_alternative<tsp::ErrorAlgorithm>(solution)) [[unlikely]] {
-    return std::get<tsp::ErrorAlgorithm>(solution);
+  if (std::holds_alternative<tsp::ErrorAlgorithm>(solution_result))
+  [[unlikely]] {
+    return std::get<tsp::ErrorAlgorithm>(solution_result);
   }
+  const tsp::Solution solution {std::get<tsp::Solution>(solution_result)};
 
-  return tsp::Result {std::get<tsp::Solution>(solution),
-                      tsp::Time {end - start}};
+  return tsp::Result {
+    solution,
+    tsp::Time {end - start},
+    optimal_cost.has_value()
+    ? std::optional{tsp::Error{.absolute = solution.cost - *optimal_cost,
+               .relative_percent =
+                  ((static_cast<double>(solution.cost) / *optimal_cost) - 1.) * 100.}}
+    : std::nullopt
+  };
 }
 
 }    // namespace util
