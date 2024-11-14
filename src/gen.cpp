@@ -48,7 +48,7 @@ init_population(const tsp::Matrix<int>&   matrix,
     return std::get<tsp::ErrorAlgorithm>(nn_result);
   }
 
-  Chromosome nn_chromosome {[&nn_solution = std::get<tsp::Solution>(nn_result),
+  const Chromosome nn_chromosome {[&nn_solution = std::get<tsp::Solution>(nn_result),
                              &v_count]() noexcept {
     std::vector vertices(v_count - 1, -1);
     for (int i {0}; i < v_count - 1; ++i) {
@@ -67,11 +67,6 @@ init_population(const tsp::Matrix<int>&   matrix,
     const auto first_v {nn_chromosome.path.at(first_v)};
     const auto second_v {nn_chromosome.path.at(second_v)};
 
-    const int first_old_cost {matrix.at(first_v).at(first_v - 1) +
-                              matrix.at(first_v).at(first_v + 1)};
-    const int second_old_cost {matrix.at(second_v).at(second_v - 1) +
-                               matrix.at(second_v).at(second_v + 1)};
-
     const int first_new_cost_left {matrix.at(first_v).at(second_v - 1)};
     const int first_new_cost_right {matrix.at(first_v).at(second_v + 1)};
     const int second_new_cost_left {matrix.at(second_v).at(first_v - 1)};
@@ -83,23 +78,32 @@ init_population(const tsp::Matrix<int>&   matrix,
       continue;
     }
 
+    const int first_old_cost {matrix.at(first_v).at(first_v - 1) +
+                              matrix.at(first_v).at(first_v + 1)};
+    const int second_old_cost {matrix.at(second_v).at(second_v - 1) +
+                               matrix.at(second_v).at(second_v + 1)};
+
     const int cost_diff {first_new_cost_left + first_new_cost_right +
                          second_new_cost_left + second_new_cost_right -
                          first_old_cost - second_old_cost};
 
-    std::swap(nn_chromosome.path.at(first_idx),
-              nn_chromosome.path.at(second_idx));
-    std::swap(nn_chromosome.vertices.at(first_v),
-              nn_chromosome.vertices.at(second_v));
+    population.emplace([&nn_chromosome,
+                        &first_v,
+                        &first_idx,
+                        &second_v,
+                        &second_idx,
+                        &cost_diff]() noexcept {
+      Chromosome chromosome {.vertices = nn_chromosome.vertices,
+                             .path     = nn_chromosome.path,
+                             .cost     = nn_chromosome.cost + cost_diff};
 
-    population.emplace(nn_chromosome.vertices,
-                       nn_chromosome.path,
-                       nn_chromosome.cost + cost_diff);
+      std::swap(chromosome.path.at(first_idx),
+                chromosome.path.at(second_idx));
+      std::swap(chromosome.vertices.at(first_v),
+                chromosome.vertices.at(second_v));
 
-    std::swap(nn_chromosome.path.at(first_idx),
-              nn_chromosome.path.at(second_idx));
-    std::swap(nn_chromosome.vertices.at(first_v),
-              nn_chromosome.vertices.at(second_v));
+      return chromosome;
+    }());
   }
 
   return population;
@@ -107,11 +111,11 @@ init_population(const tsp::Matrix<int>&   matrix,
 
 [[nodiscard]] static std::optional<Chromosome> crossover(
 const tsp::Matrix<int>& matrix,
+auto&                   rand_src,
 const Chromosome&       parent_base,
 const Chromosome&       parent2,
-auto&                   rand_src,
 int                     max_v_count_crossover) noexcept {
-  const int v_count {static_cast<int>(parent_base.path.size() - 1)};
+  const int v_count {static_cast<int>(matrix.size())};
 
   Chromosome child {.vertices = parent_base.vertices,
                     .path     = parent_base.path,
@@ -119,7 +123,7 @@ int                     max_v_count_crossover) noexcept {
 
   const std::uniform_int_distribution dist {};
 
-  const int first_idx {dist(rand_src, {1, v_count - 2})};
+  const int  first_idx {dist(rand_src, {1, v_count - 2})};
   const auto first_v {child.path.at(first_v)};
 
   const auto second_idx {parent2.vertices.at(first_v)};
@@ -131,28 +135,91 @@ int                     max_v_count_crossover) noexcept {
                    max_v_count_crossover)})};
 
   for (int i {1}; i < count; ++i) {
-    const int old_cost {matrix.at(child.path.at(first_idx + i - 1))
-                        .at(child.path.at(first_idx + i)) +
-                        matrix.at(child.path.at(first_idx + i))
-                        .at(child.path.at(first_idx + i + 1))};
+    const int base_idx {first_idx + i};
+    const int other_idx {second_idx + i};
 
-    const int new_cost_left {matrix.at(child.path.at(first_idx + i - 1))
-                             .at(parent2.path.at(second_idx + i))};
-    const int new_cost_right {matrix.at(parent2.path.at(second_idx + i))
-                              .at(child.path.at(first_idx + i + 1))};
+    const int base_v {child.path.at(base_idx)};
+    const int other_v {parent2.path.at(other_idx)};
+
+    if (base_v == other_v) [[unlikely]] {
+      continue;
+    }
+
+    if (child.vertices.at(other_v) < first_idx ||
+        child.vertices.at(other_v) >= first_idx + count) {
+      return std::nullopt;
+    }
+
+    const int new_cost_left {
+      matrix.at(child.path.at(base_idx - 1)).at(other_v)};
+    const int new_cost_right {
+      matrix.at(other_v).at(child.path.at(base_idx + 1))};
 
     if (new_cost_left == -1 || new_cost_right == -1) [[unlikely]] {
       return std::nullopt;
     }
 
+    const int old_cost {matrix.at(child.path.at(base_idx - 1)).at(base_v) +
+                        matrix.at(base_v).at(child.path.at(base_idx + 1))};
+
     const int cost_diff {new_cost_left + new_cost_right - old_cost};
 
-    child.path.at(first_idx + i)  = parent2.path.at(second_idx + i);
-    child.cost                   += cost_diff;
+    child.path.at(base_idx)     = other_v;
+    child.vertices.at(other_v)  = base_idx;
+    child.cost                 += cost_diff;
   }
+
+  return child;
 }
 
-// todo: mutate and cut + algorithm
+static bool mutate(tsp::Matrix<int>& matrix,
+                   auto&             rand_src,
+                   Chromosome&       chromosome) noexcept {
+  const int v_count {static_cast<int>(matrix.size())};
+
+  const std::uniform_int_distribution dist {1, v_count - 2};
+
+  const int swap_idx {dist(rand_src)};
+  const int swap_v {chromosome.path.at(swap_idx)};
+  const int first_v {chromosome.path.at(0)};
+
+  const int new_cost_left_s {
+    matrix.at(chromosome.path.at(v_count - 1)).at(swap_v)};
+  const int new_cost_right_s {matrix.at(swap_v).at(chromosome.path.at(1))};
+
+  const int new_cost_left_in {
+    matrix.at(chromosome.path.at(swap_idx - 1)).at(first_v)};
+  const int new_cost_right_in {
+    matrix.at(first_v).at(chromosome.path.at(swap_idx + 1))};
+
+  if (new_cost_left_s == -1 || new_cost_right_s == -1 ||
+      new_cost_left_in == -1 || new_cost_right_in == -1) [[unlikely]] {
+    return false;
+  }
+
+  const int old_cost {matrix.at(chromosome.path.at(swap_idx - 1))
+                      .at(chromosome.path.at(swap_idx)) +
+                      matrix.at(chromosome.path.at(swap_idx))
+                      .at(chromosome.path.at(swap_idx + 1)) +
+                      matrix.at(chromosome.path.at(v_count - 1)).at(first_v) +
+                      matrix.at(first_v).at(chromosome.path.at(1))};
+
+  const int cost_diff {new_cost_left_s + new_cost_right_s + new_cost_left_in +
+                       new_cost_right_in - old_cost};
+
+  std::swap(chromosome.path.at(swap_idx), chromosome.path.at(0));
+  std::swap(chromosome.vertices.at(swap_v), chromosome.vertices.at(first_v));
+
+  chromosome.cost += cost_diff;
+
+  return true;
+}
+
+static void cut(Population& population, int target_count) noexcept {
+  //todo
+}
+
+//todo: reproduce + algorithm
 
 }    // namespace gen::impl
 
