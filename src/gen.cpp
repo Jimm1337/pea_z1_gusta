@@ -16,28 +16,24 @@ struct Chromosome {
   std::vector<int> vertices;
   std::vector<int> path;
   int              cost;
+
+  constexpr std::weak_ordering operator<=>(
+  const Chromosome& other) const noexcept {
+    if (const auto result = cost <=> other.cost;
+        result != std::strong_ordering::equal) {
+      return result;
+    }
+
+    if (const auto result = path.at(1) <=> other.path.at(1);
+        result != std::strong_ordering::equal) {
+      return result;
+    }
+
+    return path.at(path.size() / 2) <=> other.path.at(other.path.size() / 2);
+  }
 };
 
-using Population =
-std::set<Chromosome,
-         decltype([](const Chromosome& lhs,
-                     const Chromosome& rhs) noexcept -> std::weak_ordering {
-           if (lhs.cost != rhs.cost) {
-             return lhs.cost <=> rhs.cost;
-           }
-
-           for (int i {0}; i < lhs.path.size(); ++i) {
-             if (lhs.path.at(i) < rhs.path.at(i)) {
-               return std::weak_ordering::less;
-             }
-
-             if (lhs.path.at(i) > rhs.path.at(i)) {
-               return std::weak_ordering::greater;
-             }
-           }
-
-           return std::weak_ordering::equivalent;
-         })>;
+using Population = std::set<Chromosome>;
 
 [[nodiscard]] static std::variant<Population, tsp::ErrorAlgorithm>
 init_population(const tsp::Matrix<int>&   matrix,
@@ -63,20 +59,13 @@ init_population(const tsp::Matrix<int>&   matrix,
 
   Population population {{nn_chromosome}};
 
-  std::uniform_int_distribution dist {0, v_count - 1};
+  const std::uniform_int_distribution dist {1, v_count - 2};
   while (population.size() != population_count) [[likely]] {
-    const int first_v {dist(rand_src)};
-    const int second_v {dist(rand_src)};
+    const int first_idx {dist(rand_src)};
+    const int second_idx {dist(rand_src)};
 
-    if (first_v == second_v || nn_chromosome.vertices.at(first_v) == 0 ||
-        nn_chromosome.vertices.at(second_v) == 0 ||
-        nn_chromosome.vertices.at(first_v) == v_count - 1 ||
-        nn_chromosome.vertices.at(second_v) == v_count - 1) [[unlikely]] {
-      continue;
-    }
-
-    const auto first_idx {nn_chromosome.vertices.at(first_v)};
-    const auto second_idx {nn_chromosome.vertices.at(second_v)};
+    const auto first_v {nn_chromosome.path.at(first_v)};
+    const auto second_v {nn_chromosome.path.at(second_v)};
 
     const int first_old_cost {matrix.at(first_v).at(first_v - 1) +
                               matrix.at(first_v).at(first_v + 1)};
@@ -128,16 +117,12 @@ int                     max_v_count_crossover) noexcept {
                     .path     = parent_base.path,
                     .cost     = parent_base.cost};
 
-  std::uniform_int_distribution dist {};
+  const std::uniform_int_distribution dist {};
 
-  const int first_v {dist(rand_src, {0, v_count - 1})};
+  const int first_idx {dist(rand_src, {1, v_count - 2})};
+  const auto first_v {child.path.at(first_v)};
 
-  const auto first_idx {child.vertices.at(first_v)};
   const auto second_idx {parent2.vertices.at(first_v)};
-
-  if (first_idx == 0 || first_idx == v_count - 1) [[unlikely]] {
-    return std::nullopt;
-  }
 
   const auto count {
     dist(rand_src,
@@ -162,10 +147,12 @@ int                     max_v_count_crossover) noexcept {
 
     const int cost_diff {new_cost_left + new_cost_right - old_cost};
 
-    child.path.at(first_idx + i) = parent2.path.at(second_idx + i);
-    child.cost += cost_diff;
+    child.path.at(first_idx + i)  = parent2.path.at(second_idx + i);
+    child.cost                   += cost_diff;
   }
 }
+
+// todo: mutate and cut + algorithm
 
 }    // namespace gen::impl
 
