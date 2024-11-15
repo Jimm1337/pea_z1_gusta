@@ -11,6 +11,8 @@
 #include <string>
 #include <variant>
 #include <vector>
+#include <optional>
+#include <utility>
 
 namespace tsp {
 

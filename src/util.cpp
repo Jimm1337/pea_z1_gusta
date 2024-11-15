@@ -186,7 +186,7 @@ const tsp::Time& duration) noexcept {
     return {.count = duration.count() / 1000 / 60 / 60, .unit = "hours"};
   }
 
-  return {.count = duration.count(), .unit = "ms"};
+  return {.count = duration.count(), .unit = "ms"}; // milliseconds
 }
 
 void report(const tsp::Arguments& arguments,

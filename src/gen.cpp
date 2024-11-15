@@ -266,6 +266,7 @@ static void reproduce(const tsp::Matrix<int>& matrix,
   std::uniform_int_distribution dist {};
 
   std::vector<Chromosome> children {};
+  children.reserve(children_per_itr);
 
   // only the first half of the population is used as parent base, the second
   // half is used as second parent
