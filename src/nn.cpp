@@ -5,6 +5,9 @@
 #include <limits>
 #include <queue>
 #include <vector>
+#include <variant>
+#include <optional>
+#include <utility>
 
 namespace nn::impl {
 
@@ -22,8 +25,7 @@ static void algorithm(const tsp::Matrix<int>& matrix,
   std::queue<WorkingSolution> queue {
     {WorkingSolution {.used_vertices =
                       [&starting_vertex, &v_count]() noexcept {
-                        std::vector<bool> used {};
-                        used.resize(v_count, false);
+                        std::vector used {std::vector(v_count, false)};
                         used.at(starting_vertex) = true;
                         return used;
                       }(),

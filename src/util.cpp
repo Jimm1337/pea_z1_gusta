@@ -8,6 +8,9 @@
 #include <limits>
 #include <sstream>
 #include <vector>
+#include <variant>
+#include <cstddef>
+#include <ranges>
 
 namespace util::config {
 

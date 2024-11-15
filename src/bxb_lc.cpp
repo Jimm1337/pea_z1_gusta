@@ -6,6 +6,9 @@
 #include <limits>
 #include <queue>
 #include <vector>
+#include <variant>
+#include <optional>
+#include <utility>
 
 namespace bxb::lc::impl {
 
@@ -104,11 +107,11 @@ const std::optional<int>& optimal_cost) noexcept {
   }
 
   // upper bound = nn solution
-  const auto upper_bound_result {nn::run(matrix, graph_info, optimal_cost)};
+  auto upper_bound_result {nn::run(matrix, graph_info, optimal_cost)};
   if (std::holds_alternative<tsp::ErrorAlgorithm>(upper_bound_result)) {
     return upper_bound_result;
   }
-  tsp::Solution best {std::get<tsp::Solution>(upper_bound_result)};
+  tsp::Solution best {std::move(std::get<tsp::Solution>(upper_bound_result))};
 
   if (graph_info.full_graph && graph_info.symmetric_graph) {
     impl::algorithm(matrix, best, 0);

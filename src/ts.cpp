@@ -1,14 +1,19 @@
 #include "ts.hpp"
 
 #include "nn.hpp"
+#include "util.hpp"
 
-#include <stack>
 #include <vector>
+#include <variant>
+#include <optional>
+#include <utility>
+#include <limits>
+#include <cstddef>
 
 namespace ts::impl {
 
 struct WorkingSolution {
-  std::vector<size_t> v_indices;
+  std::vector<size_t> v_indices; // vertex -> index in path (first/last is 0)
   tsp::Solution       solution;
 };
 
@@ -26,6 +31,7 @@ const tsp::GraphInfo&   graph_info,
 std::optional<int>      optimal_cost) noexcept {
   const size_t v_count {matrix.size()};
 
+  // use nn
   const auto upper_bound_result {nn::run(matrix, graph_info, optimal_cost)};
   if (std::holds_alternative<tsp::ErrorAlgorithm>(upper_bound_result)) {
     return std::get<tsp::ErrorAlgorithm>(upper_bound_result);
@@ -68,6 +74,8 @@ constexpr static int get_delta_cost(const tsp::Matrix<int>& matrix,
                                     const WorkingSolution&  current_solution,
                                     int                     first_v,
                                     int                     second_v) noexcept {
+  // O(1) get delta cost for swap -> get new and old costs for 4 edges, account for edge cases (adjacent/first/last)
+
   const size_t first_v_idx {current_solution.v_indices.at(first_v)};
   const int    first_prev {first_v_idx != 0
                            ? current_solution.solution.path.at(first_v_idx - 1)
@@ -133,6 +141,7 @@ int                     current_best_cost) noexcept {
       const int delta_cost {
         get_delta_cost(matrix, solution, first_v, second_v)};
 
+      // if would break solution, skip
       if (delta_cost == std::numeric_limits<int>::max()) [[unlikely]] {
         continue;
       }
@@ -189,6 +198,7 @@ static tsp::Solution algorithm(const tsp::Matrix<int>&   matrix,
   tsp::Solution    best {work.solution};
   int              no_improve_itr_count {0};
 
+  // finish if optimal solution is nn solution
   if (optimal_cost.has_value() && best.cost == *optimal_cost) {
     return best;
   }
@@ -222,6 +232,8 @@ static tsp::Solution algorithm(const tsp::Matrix<int>&   matrix,
 
         if (work.solution.cost < best.cost) {
           best = work.solution;
+
+          // finish if optimal solution is found
           if (optimal_cost.has_value() && best.cost == *optimal_cost) {
             return best;
           }
@@ -259,7 +271,7 @@ int                       tabu_itr_count) noexcept {
   }
 
   // check if path exists
-  const auto first_solution_result {
+  auto first_solution_result {
     impl::get_first_solution(matrix, graph_info, optimal_cost)};
   if (std::holds_alternative<tsp::ErrorAlgorithm>(first_solution_result)) {
     return std::get<tsp::ErrorAlgorithm>(first_solution_result);
@@ -268,7 +280,7 @@ int                       tabu_itr_count) noexcept {
   return impl::algorithm(matrix,
                          optimal_cost,
                          std::vector(v_count, std::vector(v_count, 0)),
-                         std::get<impl::WorkingSolution>(first_solution_result),
+                         std::move(std::get<impl::WorkingSolution>(first_solution_result)),
                          itr_count,
                          no_improve_stop_itr_count,
                          tabu_itr_count);

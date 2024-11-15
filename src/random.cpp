@@ -1,11 +1,15 @@
 #include "random.hpp"
 
 #include "util.hpp"
-#include <fmt/core.h>
 
 #include <limits>
 #include <random>
 #include <vector>
+#include <variant>
+#include <optional>
+#include <chrono>
+#include <utility>
+#include <cstddef>
 
 namespace random::impl {
 
@@ -16,7 +20,7 @@ struct WorkingSolution {
 
 struct RandomSource {
   std::mt19937_64                    engine;
-  std::uniform_int_distribution<int> dist;
+  std::uniform_int_distribution<> dist;
 };
 
 constexpr static int NUMBER_OF_RETRIES {1'0000};

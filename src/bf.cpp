@@ -5,6 +5,9 @@
 #include <limits>
 #include <queue>
 #include <vector>
+#include <optional>
+#include <variant>
+#include <utility>
 
 namespace bf::impl {
 
