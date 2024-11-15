@@ -8,8 +8,6 @@
 #include <set>
 #include <stack>
 
-//todo: implement
-
 namespace gen::impl {
 
 struct Chromosome {
@@ -20,6 +18,11 @@ struct Chromosome {
   constexpr std::weak_ordering operator<=>(
   const Chromosome& other) const noexcept {
     if (const auto result = cost <=> other.cost;
+        result != std::strong_ordering::equal) {
+      return result;
+    }
+
+    if (const auto result = path.at(0) <=> other.path.at(0);
         result != std::strong_ordering::equal) {
       return result;
     }
@@ -51,8 +54,8 @@ init_population(const tsp::Matrix<int>&   matrix,
   const Chromosome nn_chromosome {[&nn_result, &v_count]() noexcept {
     tsp::Solution nn_solution {std::move(std::get<tsp::Solution>(nn_result))};
 
-    std::vector vertices(v_count - 1, -1);
-    for (int i {0}; i < v_count - 1; ++i) {
+    std::vector vertices(v_count, -1);
+    for (int i {0}; i < v_count; ++i) {
       vertices.at(nn_solution.path.at(i)) = i;
     }
 
@@ -63,7 +66,7 @@ init_population(const tsp::Matrix<int>&   matrix,
 
   Population population {{nn_chromosome}};
 
-  std::uniform_int_distribution dist {1, v_count - 2};
+  std::uniform_int_distribution dist {1, v_count - 1};
   while (population.size() != population_count) [[likely]] {
     const int first_idx {dist(rand_src)};
     const int second_idx {dist(rand_src)};
@@ -71,10 +74,14 @@ init_population(const tsp::Matrix<int>&   matrix,
     const auto first_v {nn_chromosome.path.at(first_idx)};
     const auto second_v {nn_chromosome.path.at(second_idx)};
 
-    const int first_new_cost_left {matrix.at(first_v).at(second_v - 1)};
-    const int first_new_cost_right {matrix.at(first_v).at(second_v + 1)};
-    const int second_new_cost_left {matrix.at(second_v).at(first_v - 1)};
-    const int second_new_cost_right {matrix.at(second_v).at(first_v + 1)};
+    const int first_new_cost_left {
+      matrix.at(first_v).at(nn_chromosome.path.at(second_idx - 1))};
+    const int first_new_cost_right {
+      matrix.at(first_v).at(nn_chromosome.path.at(second_idx + 1))};
+    const int second_new_cost_left {
+      matrix.at(second_v).at(nn_chromosome.path.at(first_idx - 1))};
+    const int second_new_cost_right {
+      matrix.at(second_v).at(nn_chromosome.path.at(first_idx + 1))};
 
     if (first_new_cost_left == -1 || first_new_cost_right == -1 ||
         second_new_cost_left == -1 || second_new_cost_right == -1)
@@ -82,14 +89,15 @@ init_population(const tsp::Matrix<int>&   matrix,
       continue;
     }
 
-    const int first_old_cost {matrix.at(first_v).at(first_v - 1) +
-                              matrix.at(first_v).at(first_v + 1)};
-    const int second_old_cost {matrix.at(second_v).at(second_v - 1) +
-                               matrix.at(second_v).at(second_v + 1)};
+    const int old_cost {
+      matrix.at(first_v).at(nn_chromosome.path.at(first_idx - 1)) +
+      matrix.at(first_v).at(nn_chromosome.path.at(first_idx + 1)) +
+      matrix.at(second_v).at(nn_chromosome.path.at(second_idx - 1)) +
+      matrix.at(second_v).at(nn_chromosome.path.at(second_idx + 1))};
 
     const int cost_diff {first_new_cost_left + first_new_cost_right +
                          second_new_cost_left + second_new_cost_right -
-                         first_old_cost - second_old_cost};
+                         old_cost};
 
     population.emplace([&nn_chromosome,
                         &first_v,
@@ -128,17 +136,17 @@ int                     max_v_count_crossover) noexcept {
 
   const int first_idx {
     dist(rand_src,
-         std::uniform_int_distribution<>::param_type {1, v_count - 2})};
+         std::uniform_int_distribution<>::param_type {1, v_count - 1})};
   const auto first_v {child.path.at(first_idx)};
 
   const auto second_idx {parent2.vertices.at(first_v)};
 
-  const auto count {
-    dist(rand_src,
-         std::uniform_int_distribution<>::param_type {
-           1,
-           std::min(std::min(v_count - 1 - second_idx, v_count - 1 - first_idx),
-                    max_v_count_crossover)})};
+  const auto count {dist(
+  rand_src,
+  std::uniform_int_distribution<>::param_type {
+    1,
+    std::min(
+    {v_count - second_idx, v_count - first_idx, max_v_count_crossover})})};
 
   for (int i {1}; i < count; ++i) {
     const int base_idx {first_idx + i};
@@ -216,6 +224,7 @@ static std::optional<Chromosome> mutate(const tsp::Matrix<int>& matrix,
                              .cost     = base.cost + cost_diff};
 
   std::swap(new_chromosome.path.at(swap_idx), new_chromosome.path.at(0));
+  new_chromosome.path.at(v_count) = swap_v;
   std::swap(new_chromosome.vertices.at(swap_v),
             new_chromosome.vertices.at(first_v));
 
@@ -234,37 +243,48 @@ static void reproduce(const tsp::Matrix<int>& matrix,
                       int                     children_per_itr,
                       int                     children_per_pair,
                       int                     max_v_count_crossover) noexcept {
-  const int target_size {static_cast<int>(population.size()) +
-                         children_per_itr};
-
   constexpr static int MAX_RETIRES_PER_OFFSPRING {10};
 
-  for (auto first_parent_itr {population.begin()};
-       first_parent_itr != std::prev(population.end()) &&
-       population.size() < target_size;
-       ++first_parent_itr) {
-    for (auto second_parent_itr {std::next(first_parent_itr)};
-         second_parent_itr != population.end() &&
-         population.size() < target_size;
-         ++second_parent_itr) {
-      for (int offspring {0}, attempts {0};
-           offspring < children_per_pair &&
-           attempts < MAX_RETIRES_PER_OFFSPRING &&
-           population.size() < target_size;
-           ++attempts) {
-        auto child {crossover(matrix,
-                              rand_src,
-                              *first_parent_itr,
-                              *second_parent_itr,
-                              max_v_count_crossover)};
+  std::uniform_int_distribution dist {};
 
-        if (child.has_value()) {
-          ++offspring;
-          attempts = -1;
-          population.emplace(std::move(child.value()));
-        }
+  std::vector<Chromosome> children {};
+
+  while (children.size() != children_per_itr) [[likely]] {
+    const auto first_parent_itr {
+      std::next(population.begin(),
+                dist(rand_src,
+                     std::uniform_int_distribution<>::param_type {
+                       0,
+                       static_cast<int>(population.size() / 2)}))};
+
+    const auto second_parent_itr {
+      std::prev(population.end(),
+                dist(rand_src,
+                     std::uniform_int_distribution<>::param_type {
+                       1,
+                       static_cast<int>(population.size() / 2) - 1}))};
+
+    for (int offspring {0}, attempts {0};
+         offspring < children_per_pair &&
+         attempts < MAX_RETIRES_PER_OFFSPRING &&
+         children.size() < children_per_itr;
+         ++attempts) {
+      auto child {crossover(matrix,
+                            rand_src,
+                            *first_parent_itr,
+                            *second_parent_itr,
+                            max_v_count_crossover)};
+
+      if (child.has_value()) {
+        ++offspring;
+        attempts = -1;
+        children.emplace_back(std::move(child.value()));
       }
     }
+  }
+
+  for (auto&& child : children) {
+    population.emplace(std::move(child));
   }
 }
 

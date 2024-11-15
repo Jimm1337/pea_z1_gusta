@@ -18,7 +18,7 @@ int main(int argc, const char** argv) {
   // const tsp::Arguments arg {std::get<tsp::Arguments>(arg_result)};
   const tsp::Arguments arg {
     .algorithm   = tsp::Algorithm::GENETIC,
-    .config_file = "../../data/tsplib_tsp/configs/14_burma14.ini"};
+    .config_file = "../../data/tsplib_tsp/configs/225_tsp225.ini"};
 
   const auto config_result {util::config::read(arg.config_file)};
   if (util::error::handle(config_result) == tsp::State::ERROR) {
