@@ -12,6 +12,7 @@ int                     count_of_itr,
 int                     population_size,
 int                     count_of_children,
 int                     max_children_per_pair,
+int                     max_v_count_crossover,
 int                     mutations_per_1000) noexcept;
 
 }    // namespace gen

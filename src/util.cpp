@@ -30,9 +30,10 @@ void help_page() noexcept {
   "[genetic]\n"
   "itr = <integer iterations>\n"
   "population_size = <integer population after selection>\n"
-  "count_of_children = <integer count of all children in itr>\n"
-  "max_children_per_pair = <integer max children per pair (1 - 8)>\n"
-  "mutations_per_1000 = <integer ppt of chromosomes to mutate before selection>\n\n"
+  "children_per_itr = <integer count of all children in itr>\n"
+  "max_children_per_pair = <integer max children per pair>\n"
+  "max_v_count_crossover = <integer max vertices to crossover>\n"
+  "mutations_per_1000 = <integer ppt of chromosomes to mutate>\n\n"
   "- Example:\n\n"
   "[instance]\n"
   "input_path = C:/dev/pea_z1_gusta/data/test_6_as.txt\n"
@@ -52,6 +53,7 @@ void help_page() noexcept {
   "population_size = 50\n"
   "count_of_children = 50\n"
   "max_children_per_pair = 4\n"
+  "max_v_count_crossover = 5\n"
   "mutations_per_1000 = 5\n\n");
 }
 
@@ -101,10 +103,12 @@ const std::filesystem::path& config_file) noexcept {
                     .itr = static_cast<int>(reader.GetInteger("genetic", "itr", -1)),
                     .population_size =
       static_cast<int>(reader.GetInteger("genetic", "population_size", -1)),
-                    .count_of_children =
-      static_cast<int>(reader.GetInteger("genetic", "count_of_children", -1)),
+                    .children_per_itr =
+      static_cast<int>(reader.GetInteger("genetic", "children_per_itr", -1)),
                     .max_children_per_pair = static_cast<int>(
       reader.GetInteger("genetic", "max_children_per_pair", -1)),
+                    .max_v_count_crossover = static_cast<int>(
+      reader.GetInteger("genetic", "max_v_count_crossover", -1)),
                     .mutations_per_1000 = static_cast<int>(
       reader.GetInteger("genetic", "mutations_per_1000", -1))}
   };
@@ -266,9 +270,11 @@ void report(const tsp::Arguments& arguments,
       fmt::println("- Count of iterations: {}", params.genetic.itr);
       fmt::println("- Population size: {}", params.genetic.population_size);
       fmt::println("- Children per iteration: {}",
-                   params.genetic.count_of_children);
+                   params.genetic.children_per_itr);
       fmt::println("- Maximum children per pair: {}",
                    params.genetic.max_children_per_pair);
+      fmt::println("- Maximum number of vertices to crossover: {}",
+                   params.genetic.max_v_count_crossover);
       fmt::println("- Mutation chance: {:.1f}%\n",
                    static_cast<double>(params.genetic.mutations_per_1000) / 10);
       break;

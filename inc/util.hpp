@@ -81,8 +81,9 @@ struct ParamTabuSearch {
 struct ParamGenetic {
   int itr;
   int population_size;
-  int count_of_children;
+  int children_per_itr;
   int max_children_per_pair;
+  int max_v_count_crossover;
   int mutations_per_1000;
 };
 
