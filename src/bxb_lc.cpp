@@ -1,16 +1,48 @@
 #include "bxb.hpp"
 #include "nn.hpp"
 #include "util.hpp"
+#include <initializer_list>
 
+#include <algorithm>
 #include <cstddef>
 #include <limits>
-#include <queue>
-#include <vector>
-#include <variant>
 #include <optional>
 #include <utility>
+#include <variant>
+#include <vector>
 
 namespace bxb::lc::impl {
+
+template<typename T, typename Cmp = std::less<T>>
+class Heap {
+  std::vector<T> data;
+  Cmp            cmp;
+
+public:
+  constexpr Heap(const Cmp&               cmp  = Cmp {},
+                 std::initializer_list<T> init = {}) noexcept:
+    data {init},
+    cmp {cmp} {
+    std::ranges::make_heap(data, cmp);
+  }
+
+  template<typename Ty>
+  constexpr void push(Ty&& value) noexcept {
+    data.emplace_back(std::forward<Ty>(value));
+    std::ranges::push_heap(data, cmp);
+  }
+
+  constexpr T pop() noexcept {
+    std::ranges::pop_heap(data, cmp);
+    const T top {std::move(data.back())};
+    data.pop_back();
+    return top;
+  }
+
+  [[nodiscard]] constexpr bool empty() const noexcept {
+    return data.empty();
+  }
+};
 
 struct WorkingSolution {
   std::vector<bool> used_vertices;
@@ -47,10 +79,8 @@ static void algorithm(const tsp::Matrix<int>& matrix,
                       int                     starting_vertex) {
   const size_t v_count {matrix.size()};
 
-  std::priority_queue<WorkingSolution,
-                      std::vector<WorkingSolution>,
-                      bool (*)(const WorkingSolution&,
-                               const WorkingSolution&) noexcept>
+  Heap<WorkingSolution,
+       bool (*)(const WorkingSolution&, const WorkingSolution&) noexcept>
   least_cost_heap {
     [](const WorkingSolution& lhs, const WorkingSolution& rhs) noexcept {
       return lhs.solution.cost > rhs.solution.cost;
@@ -64,8 +94,7 @@ static void algorithm(const tsp::Matrix<int>& matrix,
                       .solution = {.path = {starting_vertex}, .cost = 0}}}};
 
   while (!least_cost_heap.empty()) [[likely]] {
-    WorkingSolution node {least_cost_heap.top()};
-    least_cost_heap.pop();
+    WorkingSolution node {least_cost_heap.pop()};
 
     const int current_v {node.solution.path.back()};
     const int current_cost {node.solution.cost};
@@ -85,8 +114,8 @@ static void algorithm(const tsp::Matrix<int>& matrix,
       }
     } else [[likely]] {
       // if not leaf add viable children to priority queue
-      for (const auto& child : branch(matrix, node, current_best.cost)) {
-        least_cost_heap.emplace(child);
+      for (auto&& child : branch(matrix, node, current_best.cost)) {
+        least_cost_heap.push(std::move(child));
       }
     }
   }

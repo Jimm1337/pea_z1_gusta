@@ -150,7 +150,7 @@ const std::filesystem::path& config_file) noexcept {
   }
 
   const int optimal_solution_cost {static_cast<int>(
-  reader.GetInteger("optimal", "cost", std::numeric_limits<int>::max()))};
+  reader.GetInteger("optimal", "cost", -1))};
 
   return tsp::Instance {
     .matrix      = matrix,
@@ -205,7 +205,7 @@ void report(const tsp::Arguments& arguments,
 
   fmt::println("Config ({})", config_filename.generic_string());
   fmt::println("- Input file: {}", input_filename.generic_string());
-  if (optimal_solution.cost == std::numeric_limits<int>::max()) {
+  if (optimal_solution.cost == -1) {
     fmt::println("- Optimal cost: NOT PROVIDED");
   } else {
     fmt::println("- Optimal cost: {}", optimal_solution.cost);

@@ -13,14 +13,11 @@
 #pragma comment(lib, "Kernel32.lib")
 
 int main(int argc, const char** argv) {
-  // const auto arg_result {util::arg::read(argc, argv)};
-  // if (util::error::handle(arg_result) == tsp::State::ERROR) {
-  //   return EXIT_FAILURE;
-  // }
-  // const tsp::Arguments arg {std::get<tsp::Arguments>(arg_result)};
-  const tsp::Arguments arg {
-    .algorithm   = tsp::Algorithm::GENETIC,
-    .config_file = "../../data/tsplib_atsp/configs/71_ftv70.ini"};
+  const auto arg_result {util::arg::read(argc, argv)};
+  if (util::error::handle(arg_result) == tsp::State::ERROR) {
+    return EXIT_FAILURE;
+  }
+  const tsp::Arguments arg {std::get<tsp::Arguments>(arg_result)};
 
   const auto config_result {util::config::read(arg.config_file)};
   if (util::error::handle(config_result) == tsp::State::ERROR) {

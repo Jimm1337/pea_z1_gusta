@@ -21,7 +21,7 @@ elseif (CMAKE_BUILD_TYPE MATCHES Release)
 #    GL - Whole program optimization
 #    arch:SSE4.2 - Enable SSE4.2 instructions
 #    LTCG - Link-time code generation
-    add_compile_options(/O2 /Ob3 /Oi /Ot /Oy /GL /arch:SSE4.2)
+    add_compile_options(/O2 /Ob3 /Oi /Ot /Oy /GL /arch:SSE2 /arch:SSE4.2 /arch:AVX /arch:AVX2 /arch:AVX512)
     add_link_options(/LTCG)
 else ()
     message(FATAL_ERROR "Unknown build type: ${CMAKE_BUILD_TYPE} (use Debug or Release)")
