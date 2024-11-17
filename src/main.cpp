@@ -5,9 +5,9 @@
 #include "random.hpp"
 #include "ts.hpp"
 #include "util.hpp"
-#include <optional>
-#include <cstdlib>
 
+#include <cstdlib>
+#include <optional>
 #include <windows.h>
 
 #pragma comment(lib, "Kernel32.lib")
@@ -19,7 +19,15 @@ int main(int argc, const char** argv) {
   }
   const tsp::Arguments arg {std::get<tsp::Arguments>(arg_result)};
 
-  const auto config_result {util::config::read(arg.config_file)};
+  // measuring run
+  if (std::holds_alternative<tsp::MeasuringRun>(arg)) {
+    util::measure::execute_measurements(std::get<tsp::MeasuringRun>(arg));
+    return EXIT_SUCCESS;
+  }
+
+  // single run
+  const auto config_result {
+    util::config::read(std::get<tsp::SingleRun>(arg).config_file)};
   if (util::error::handle(config_result) == tsp::State::ERROR) {
     return EXIT_FAILURE;
   }
@@ -37,9 +45,12 @@ int main(int argc, const char** argv) {
                                     : std::nullopt};
 
   const auto timed_result {[&arg, &config, &optimal_cost]() noexcept {
-    switch (arg.algorithm) {
+    switch (std::get<tsp::SingleRun>(arg).algorithm) {
       case tsp::Algorithm::BRUTE_FORCE:
-        return util::measured_run(bf::run, config.matrix, config.graph_info, optimal_cost);
+        return util::measured_run(bf::run,
+                                  config.matrix,
+                                  config.graph_info,
+                                  optimal_cost);
       case tsp::Algorithm::NEAREST_NEIGHBOUR:
         return util::measured_run(nn::run,
                                   config.matrix,
@@ -94,7 +105,7 @@ int main(int argc, const char** argv) {
   }
   const tsp::Result timed {std::get<tsp::Result>(timed_result)};
 
-  util::output::report(arg, config, timed);
+  util::output::report(std::get<tsp::SingleRun>(arg), config, timed);
 
   return EXIT_SUCCESS;
 }

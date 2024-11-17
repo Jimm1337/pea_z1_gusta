@@ -74,7 +74,7 @@ int                     max_cost) noexcept {
   return children;
 }
 
-static void algorithm(const tsp::Matrix<int>& matrix,
+constexpr static void algorithm(const tsp::Matrix<int>& matrix,
                       tsp::Solution&          current_best,
                       int                     starting_vertex) {
   const size_t v_count {matrix.size()};

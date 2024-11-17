@@ -390,15 +390,15 @@ int                       mutations_per_1000) noexcept {
     return tsp::ErrorAlgorithm::INVALID_PARAM;
   }
 
-  if (matrix.empty()) [[unlikely]] {
+  if (matrix.empty()) [[unlikely]] { // edge case: no vertices
     return tsp::ErrorAlgorithm::NO_PATH;
   }
 
-  if (matrix.size() == 1) [[unlikely]] {
+  if (matrix.size() == 1) [[unlikely]] { // edge case: 1 vertex
     return tsp::Solution {.path = {0}, .cost = 0};
   }
 
-  if (matrix.size() == 2) [[unlikely]] {
+  if (matrix.size() == 2) [[unlikely]] { // edge case: 2 vertices
     return nn::run(matrix, graph_info, optimal_cost);
   }
 

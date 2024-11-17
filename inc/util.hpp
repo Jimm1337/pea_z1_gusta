@@ -13,6 +13,7 @@
 #include <vector>
 #include <optional>
 #include <utility>
+#include <array>
 
 namespace tsp {
 
@@ -60,10 +61,14 @@ enum class ErrorRead : uint_fast8_t {
   BAD_DATA,
 };
 
-struct Arguments {
+using MeasuringRun = std::array<Algorithm, 8>;
+
+struct SingleRun {
   Algorithm             algorithm;
   std::filesystem::path config_file;
 };
+
+using Arguments = std::variant<MeasuringRun, SingleRun>;
 
 struct Solution {
   std::vector<int> path;
@@ -138,7 +143,7 @@ void help_page() noexcept;
 
 namespace util::output {
 
-void report(const tsp::Arguments& arguments,
+void report(const tsp::SingleRun& arguments,
             const tsp::Instance&  instance,
             const tsp::Result&    result) noexcept;
 
@@ -162,6 +167,12 @@ const char** argv) noexcept;
 void help_page() noexcept;
 
 }    // namespace util::arg
+
+namespace util::measure {
+
+void execute_measurements(const tsp::MeasuringRun& run) noexcept;
+
+}
 
 namespace util::error {
 

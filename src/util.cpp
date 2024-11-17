@@ -3,14 +3,13 @@
 #include <fmt/core.h>
 
 #include <INIReader.h>
+#include <cstddef>
 #include <filesystem>
 #include <fstream>
-#include <limits>
-#include <sstream>
-#include <vector>
-#include <variant>
-#include <cstddef>
 #include <ranges>
+#include <sstream>
+#include <variant>
+#include <vector>
 
 namespace util::config {
 
@@ -149,8 +148,8 @@ const std::filesystem::path& config_file) noexcept {
     return tsp::ErrorConfig::BAD_CONFIG;
   }
 
-  const int optimal_solution_cost {static_cast<int>(
-  reader.GetInteger("optimal", "cost", -1))};
+  const int optimal_solution_cost {
+    static_cast<int>(reader.GetInteger("optimal", "cost", -1))};
 
   return tsp::Instance {
     .matrix      = matrix,
@@ -186,10 +185,10 @@ const tsp::Time& duration) noexcept {
     return {.count = duration.count() / 1000 / 60 / 60, .unit = "hours"};
   }
 
-  return {.count = duration.count(), .unit = "ms"}; // milliseconds
+  return {.count = duration.count(), .unit = "ms"};    // milliseconds
 }
 
-void report(const tsp::Arguments& arguments,
+void report(const tsp::SingleRun& arguments,
             const tsp::Instance&  instance,
             const tsp::Result&    result) noexcept {
   const auto& [matrix,
@@ -374,7 +373,8 @@ namespace util::arg {
 void help_page() noexcept {
   fmt::println(
   "Usage:\n"
-  "pea_z1_gusta --config=<config file path> <one of the algorithm flags>\n\n"
+  "(Single Run) pea_z1_gusta --config=<config file path> <one of the algorithm flags>\n"
+  "(Measuring Run) pea_z1_gusta --measure <one or more of the algorithm flags>\n\n"
   "Flags:\n"
   " -bf: Use Brute Force algorithm\n"
   " -nn: Use Nearest Neighbour algorithm\n"
@@ -385,7 +385,8 @@ void help_page() noexcept {
   " -ts: Use Tabu Search algorithm\n"
   " -g : Use Genetic algorithm\n\n"
   "Example:\n"
-  "pea_z1_gusta --config=C:/dev/pea_z1_gusta/configs/test_6.ini -r\n");
+  "pea_z1_gusta --config=C:/dev/pea_z1_gusta/configs/test_6.ini -r\n"
+  "pea_z1_gusta --measure -nn -r -lc -bb -bd -ts -g\n");
 }
 
 [[nodiscard]] std::variant<tsp::Arguments, tsp::ErrorArg> read(
@@ -412,6 +413,53 @@ const char** argv) noexcept {
   const bool algo_ts {std::ranges::find(arg_vec, "-ts") != arg_vec.end()};
   const bool algo_gen {std::ranges::find(arg_vec, "-g") != arg_vec.end()};
 
+  // do measuring run
+  if (std::ranges::find(arg_vec, "--measure") != arg_vec.end()) {
+    tsp::MeasuringRun run {};
+    run.fill(tsp::Algorithm::INVALID);
+
+    if (algo_nn) {
+      run.at(0) = tsp::Algorithm::NEAREST_NEIGHBOUR;
+    }
+
+    if (algo_bf) {
+      run.at(1) = tsp::Algorithm::BRUTE_FORCE;
+    }
+
+    if (algo_random) {
+      run.at(2) = tsp::Algorithm::RANDOM;
+    }
+
+    if (algo_bxblc) {
+      run.at(3) = tsp::Algorithm::BXB_LEAST_COST;
+    }
+
+    if (algo_bxbbfs) {
+      run.at(4) = tsp::Algorithm::BXB_BFS;
+    }
+
+    if (algo_bxbdfs) {
+      run.at(5) = tsp::Algorithm::BXB_DFS;
+    }
+
+    if (algo_ts) {
+      run.at(6) = tsp::Algorithm::TABU_SEARCH;
+    }
+
+    if (algo_gen) {
+      run.at(7) = tsp::Algorithm::GENETIC;
+    }
+
+    if (std::ranges::all_of(run, [](const tsp::Algorithm& algo) {
+          return algo == tsp::Algorithm::INVALID;
+        })) [[unlikely]] {
+      return tsp::ErrorArg::BAD_ARG;
+    }
+
+    return run;
+  }
+
+  // do single run
   const std::string config_path {[&arg_vec]() noexcept {
     const auto itr {std::ranges::find_if(arg_vec, [](const std::string& str) {
       return str.substr(0, 9) == "--config=";
@@ -469,7 +517,7 @@ const char** argv) noexcept {
     return tsp::ErrorArg::NO_ARG;
   }
 
-  return tsp::Arguments {
+  return tsp::SingleRun {
     .algorithm   = algo_nn     ? tsp::Algorithm::NEAREST_NEIGHBOUR
                  : algo_bf     ? tsp::Algorithm::BRUTE_FORCE
                  : algo_random ? tsp::Algorithm::RANDOM
@@ -483,3 +531,11 @@ const char** argv) noexcept {
 }
 
 }    // namespace util::arg
+
+namespace util::measure {
+
+void execute_measurements(const tsp::MeasuringRun& run) noexcept {
+//todo
+}
+
+}    // namespace util::measure
