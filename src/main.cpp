@@ -9,6 +9,7 @@
 #include <cstdlib>
 #include <optional>
 #include <windows.h>
+#include <variant>
 
 #pragma comment(lib, "Kernel32.lib")
 
@@ -19,9 +20,19 @@ int main(int argc, const char** argv) {
   }
   const tsp::Arguments arg {std::get<tsp::Arguments>(arg_result)};
 
+  // set priority for process and thread for more consistent results.
+  if (SetPriorityClass(GetCurrentProcess(), HIGH_PRIORITY_CLASS) == 0 ||
+      SetThreadPriority(GetCurrentThread(), THREAD_PRIORITY_HIGHEST) == 0) {
+    fmt::println(
+    "[W] Could not set task priority to HIGH. Timing may be inconsistent.");
+  }
+
   // measuring run
   if (std::holds_alternative<tsp::MeasuringRun>(arg)) {
-    util::measure::execute_measurements(std::get<tsp::MeasuringRun>(arg));
+    if (util::error::handle(util::measure::execute_measurements(
+        std::get<tsp::MeasuringRun>(arg))) == tsp::State::ERROR) {
+      return EXIT_FAILURE;
+    }
     return EXIT_SUCCESS;
   }
 
@@ -32,13 +43,6 @@ int main(int argc, const char** argv) {
     return EXIT_FAILURE;
   }
   const tsp::Instance config {std::get<tsp::Instance>(config_result)};
-
-  // set priority for process and thread for more consistent results.
-  if (SetPriorityClass(GetCurrentProcess(), HIGH_PRIORITY_CLASS) == 0 ||
-      SetThreadPriority(GetCurrentThread(), THREAD_PRIORITY_HIGHEST) == 0) {
-    fmt::println(
-    "[W] Could not set task priority to HIGH. Timing may be inconsistent.");
-  }
 
   const std::optional optimal_cost {config.optimal.cost != -1
                                     ? std::optional {config.optimal.cost}
@@ -97,7 +101,7 @@ int main(int argc, const char** argv) {
                                   config.params.genetic.max_v_count_crossover,
                                   config.params.genetic.mutations_per_1000);
       default:
-        std::terminate();
+        std::exit(1);
     }
   }()};
   if (util::error::handle(timed_result) == tsp::State::ERROR) {

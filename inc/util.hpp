@@ -3,17 +3,17 @@
 #include <fmt/core.h>
 #include <type_traits>
 
+#include <array>
 #include <chrono>
 #include <concepts>
 #include <cstdint>
 #include <filesystem>
+#include <optional>
 #include <ratio>
 #include <string>
+#include <utility>
 #include <variant>
 #include <vector>
-#include <optional>
-#include <utility>
-#include <array>
 
 namespace tsp {
 
@@ -61,7 +61,15 @@ enum class ErrorRead : uint_fast8_t {
   BAD_DATA,
 };
 
-using MeasuringRun = std::array<Algorithm, 8>;
+enum class ErrorMeasure : uint_fast8_t {
+  ALGORITHM_ERROR,
+  FILE_ERROR,
+};
+
+struct MeasuringRun {
+  std::array<Algorithm, 8> algorithms;
+  bool verbose;
+};
 
 struct SingleRun {
   Algorithm             algorithm;
@@ -170,9 +178,10 @@ void help_page() noexcept;
 
 namespace util::measure {
 
-void execute_measurements(const tsp::MeasuringRun& run) noexcept;
+std::variant<std::monostate, tsp::ErrorMeasure> execute_measurements(
+const tsp::MeasuringRun& run) noexcept;
 
-}
+}    // namespace util::measure
 
 namespace util::error {
 
@@ -180,7 +189,8 @@ template<typename Ret, typename Error>
 requires std::same_as<std::remove_cvref_t<Error>, tsp::ErrorAlgorithm> ||
          std::same_as<std::remove_cvref_t<Error>, tsp::ErrorArg> ||
          std::same_as<std::remove_cvref_t<Error>, tsp::ErrorConfig> ||
-         std::same_as<std::remove_cvref_t<Error>, tsp::ErrorRead>
+         std::same_as<std::remove_cvref_t<Error>, tsp::ErrorRead> ||
+         std::same_as<std::remove_cvref_t<Error>, tsp::ErrorMeasure>
 tsp::State handle(const std::variant<Ret, Error>& result) noexcept {
   using Err = std::remove_cvref_t<Error>;
 
@@ -278,6 +288,24 @@ tsp::State handle(const std::variant<Ret, Error>& result) noexcept {
     }
   }
 
+  if constexpr (std::is_same_v<Err, tsp::ErrorMeasure>) {
+    if (std::holds_alternative<Error>(result)) [[unlikely]] {
+      fmt::print("[E] Error during measurements: ");
+
+      switch (std::get<1>(result)) {
+        case tsp::ErrorMeasure::ALGORITHM_ERROR:
+          fmt::println("Algorithm error occurred during measurements!");
+          return tsp::State::ERROR;
+        case tsp::ErrorMeasure::FILE_ERROR:
+          fmt::println("File error occurred during measurements!");
+          return tsp::State::ERROR;
+        default:
+          fmt::println("Something went wrong!");
+          return tsp::State::ERROR;
+      }
+    }
+  }
+
   return tsp::State::OK;
 }
 
@@ -286,19 +314,30 @@ tsp::State handle(const std::variant<Ret, Error>& result) noexcept {
 namespace util {
 
 template<typename Func, typename... Params>
-requires std::invocable<Func, const tsp::Matrix<int>&, const tsp::GraphInfo&, const std::optional<int>&, Params...> &&
-         std::is_same_v<std::invoke_result_t<Func, const tsp::Matrix<int>&, const tsp::GraphInfo&, const std::optional<int>&, Params...>,
+requires std::invocable<Func,
+                        const tsp::Matrix<int>&,
+                        const tsp::GraphInfo&,
+                        const std::optional<int>&,
+                        Params...> &&
+         std::is_same_v<std::invoke_result_t<Func,
+                                             const tsp::Matrix<int>&,
+                                             const tsp::GraphInfo&,
+                                             const std::optional<int>&,
+                                             Params...>,
                         std::variant<tsp::Solution, tsp::ErrorAlgorithm>>
 [[nodiscard]] std::variant<tsp::Result, tsp::ErrorAlgorithm> measured_run(
 Func                      algorithm,
-const tsp::Matrix<int>& matrix,
-const tsp::GraphInfo&   graph_info,
-const std::optional<int>&      optimal_cost,
+const tsp::Matrix<int>&   matrix,
+const tsp::GraphInfo&     graph_info,
+const std::optional<int>& optimal_cost,
 Params&&... params) noexcept {
   const auto start {std::chrono::high_resolution_clock::now()};
 
   const std::variant<tsp::Solution, tsp::ErrorAlgorithm> solution_result {
-    algorithm(matrix, graph_info, optimal_cost, std::forward<Params>(params)...)};
+    algorithm(matrix,
+              graph_info,
+              optimal_cost,
+              std::forward<Params>(params)...)};
 
   const auto end {std::chrono::high_resolution_clock::now()};
 
@@ -312,11 +351,11 @@ Params&&... params) noexcept {
     solution,
     tsp::Time {end - start},
     optimal_cost.has_value()
-    ? std::optional{tsp::Error{.absolute = solution.cost - *optimal_cost,
-               .relative_percent =
-                  ((static_cast<double>(solution.cost) / *optimal_cost) - 1.) * 100.}}
-    : std::nullopt
-  };
+    ? std::optional {tsp::Error {
+        .absolute = solution.cost - *optimal_cost,
+        .relative_percent =
+        ((static_cast<double>(solution.cost) / *optimal_cost) - 1.) * 100.}}
+    : std::nullopt};
 }
 
 }    // namespace util

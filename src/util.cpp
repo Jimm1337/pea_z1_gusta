@@ -1,11 +1,19 @@
 #include "util.hpp"
 
+#include "bf.hpp"
+#include "bxb.hpp"
+#include "gen.hpp"
+#include "nn.hpp"
+#include "random.hpp"
+#include "ts.hpp"
 #include <fmt/core.h>
 
 #include <INIReader.h>
+#include <array>
 #include <cstddef>
 #include <filesystem>
 #include <fstream>
+#include <optional>
 #include <ranges>
 #include <sstream>
 #include <variant>
@@ -374,7 +382,7 @@ void help_page() noexcept {
   fmt::println(
   "Usage:\n"
   "(Single Run) pea_z1_gusta --config=<config file path> <one of the algorithm flags>\n"
-  "(Measuring Run) pea_z1_gusta --measure <one or more of the algorithm flags>\n\n"
+  "(Measuring Run) pea_z1_gusta --measure (optional)--verbose <one or more of the algorithm flags>\n\n"
   "Flags:\n"
   " -bf: Use Brute Force algorithm\n"
   " -nn: Use Nearest Neighbour algorithm\n"
@@ -386,7 +394,7 @@ void help_page() noexcept {
   " -g : Use Genetic algorithm\n\n"
   "Example:\n"
   "pea_z1_gusta --config=C:/dev/pea_z1_gusta/configs/test_6.ini -r\n"
-  "pea_z1_gusta --measure -nn -r -lc -bb -bd -ts -g\n");
+  "pea_z1_gusta --measure --verbose -nn -r -lc -bb -bd -ts -g\n");
 }
 
 [[nodiscard]] std::variant<tsp::Arguments, tsp::ErrorArg> read(
@@ -416,41 +424,45 @@ const char** argv) noexcept {
   // do measuring run
   if (std::ranges::find(arg_vec, "--measure") != arg_vec.end()) {
     tsp::MeasuringRun run {};
-    run.fill(tsp::Algorithm::INVALID);
+    run.algorithms.fill(tsp::Algorithm::INVALID);
+
+    if (std::ranges::find(arg_vec, "--verbose") != arg_vec.end()) {
+      run.verbose = true;
+    }
 
     if (algo_nn) {
-      run.at(0) = tsp::Algorithm::NEAREST_NEIGHBOUR;
+      run.algorithms.at(0) = tsp::Algorithm::NEAREST_NEIGHBOUR;
     }
 
     if (algo_bf) {
-      run.at(1) = tsp::Algorithm::BRUTE_FORCE;
+      run.algorithms.at(1) = tsp::Algorithm::BRUTE_FORCE;
     }
 
     if (algo_random) {
-      run.at(2) = tsp::Algorithm::RANDOM;
+      run.algorithms.at(2) = tsp::Algorithm::RANDOM;
     }
 
     if (algo_bxblc) {
-      run.at(3) = tsp::Algorithm::BXB_LEAST_COST;
+      run.algorithms.at(3) = tsp::Algorithm::BXB_LEAST_COST;
     }
 
     if (algo_bxbbfs) {
-      run.at(4) = tsp::Algorithm::BXB_BFS;
+      run.algorithms.at(4) = tsp::Algorithm::BXB_BFS;
     }
 
     if (algo_bxbdfs) {
-      run.at(5) = tsp::Algorithm::BXB_DFS;
+      run.algorithms.at(5) = tsp::Algorithm::BXB_DFS;
     }
 
     if (algo_ts) {
-      run.at(6) = tsp::Algorithm::TABU_SEARCH;
+      run.algorithms.at(6) = tsp::Algorithm::TABU_SEARCH;
     }
 
     if (algo_gen) {
-      run.at(7) = tsp::Algorithm::GENETIC;
+      run.algorithms.at(7) = tsp::Algorithm::GENETIC;
     }
 
-    if (std::ranges::all_of(run, [](const tsp::Algorithm& algo) {
+    if (std::ranges::all_of(run.algorithms, [](const tsp::Algorithm& algo) {
           return algo == tsp::Algorithm::INVALID;
         })) [[unlikely]] {
       return tsp::ErrorArg::BAD_ARG;
@@ -534,8 +546,417 @@ const char** argv) noexcept {
 
 namespace util::measure {
 
-void execute_measurements(const tsp::MeasuringRun& run) noexcept {
-//todo
+template<typename AlgoRun, typename... Params>
+static std::optional<tsp::ErrorMeasure> z1z2_measure_trivial_symmetric(
+AlgoRun     algorithm_run_func,
+int         max_v,
+bool        verbose,
+const char* out,
+Params&&... algo_params) noexcept {
+  const tsp::GraphInfo graph_info_s {true, true};
+
+  std::ofstream file_s {out};
+
+  if (!file_s.is_open()) {
+    fmt::println("[E] Could not open file for writing!");
+    return tsp::ErrorMeasure::FILE_ERROR;
+  }
+
+  file_s << "Nazwa;Koszt optymalny;Koszt obliczony;Czas [us]\n";
+
+  for (int s {5}; s < std::min(20, max_v); ++s) {
+    if (verbose) {
+      fmt::print("Random  Symmetric {:>2}: ", s);
+    }
+
+    const auto instance_result {
+      config::read(fmt::format("./data/rand_tsp/configs/{}_rand_s.ini", s))};
+    if (error::handle(instance_result) == tsp::State::ERROR) {
+      fmt::println(
+      "[E] Make sure the config files are in (./data/rand_tsp/configs/<instance>_rand_s.ini)!");
+      return tsp::ErrorMeasure::FILE_ERROR;
+    }
+    const tsp::Instance instance {std::get<tsp::Instance>(instance_result)};
+
+    std::array<tsp::Result, 3>  cache_runs {};
+    std::array<tsp::Result, 10> runs {};
+
+    for (int i {0}; i < 3; ++i) {
+      auto result {measured_run(algorithm_run_func,
+                                instance.matrix,
+                                graph_info_s,
+                                std::optional {instance.optimal.cost},
+                                std::forward<Params>(algo_params)...)};
+      if (error::handle(result) == tsp::State::ERROR) {
+        return tsp::ErrorMeasure::ALGORITHM_ERROR;
+      }
+      cache_runs.at(i) = std::move(std::get<tsp::Result>(result));
+    }
+
+    if (verbose) {
+      fmt::print("[");
+    }
+
+    for (int i {0}; i < 10; ++i) {
+      auto result_ {measured_run(algorithm_run_func,
+                                 instance.matrix,
+                                 graph_info_s,
+                                 std::optional {instance.optimal.cost},
+                                 std::forward<Params>(algo_params)...)};
+      if (error::handle(result_) == tsp::State::ERROR) [[unlikely]] {
+        return tsp::ErrorMeasure::ALGORITHM_ERROR;
+      }
+
+      runs.at(i) = std::move(std::get<tsp::Result>(result_));
+
+      if (verbose) {
+        fmt::print("-");
+      }
+    }
+
+    if (verbose) {
+      fmt::println("]");
+    }
+
+    const std::string instance_name {instance.input_file.filename().string()};
+    const int         optimal_cost {instance.optimal.cost};
+    for (const tsp::Result& run : runs) {
+      const int         cost {run.solution.cost};
+      const std::string time_us {
+        fmt::format("{:.2f}", run.time.count() / 1000.)};
+
+      file_s << fmt::format("{};{};{};{}\n",
+                            instance_name,
+                            optimal_cost,
+                            cost,
+                            time_us);
+    }
+  }
+}
+
+template<typename AlgoRun, typename... Params>
+static std::optional<tsp::ErrorMeasure> z1z2_measure_trivial_asymmetric(
+AlgoRun     algorithm_run_func,
+int         max_v,
+bool        verbose,
+const char* out,
+Params&&... algo_params) noexcept {
+  const tsp::GraphInfo graph_info_as {false, false};
+
+  std::ofstream file_as {out};
+
+  if (!file_as.is_open()) {
+    fmt::println("[E] Could not open file for writing!");
+    return tsp::ErrorMeasure::FILE_ERROR;
+  }
+
+  file_as << "Nazwa;Koszt optymalny;Koszt obliczony;Czas [us]\n";
+
+  for (int s {5}; s < std::min(19, max_v); ++s) {
+    if (verbose) {
+      fmt::print("Random ASymmetric {:>2}: ", s);
+    }
+
+    const auto instance_result {
+      config::read(fmt::format("./data/rand_atsp/configs/{}_rand_as.ini", s))};
+    if (error::handle(instance_result) == tsp::State::ERROR) {
+      fmt::println(
+      "[E] Make sure the config files are in (./data/rand_atsp/configs/<instance>_rand_as.ini)!");
+      return tsp::ErrorMeasure::FILE_ERROR;
+    }
+    const tsp::Instance instance {std::get<tsp::Instance>(instance_result)};
+
+    std::array<tsp::Result, 3>  cache_runs {};
+    std::array<tsp::Result, 10> runs {};
+
+    for (int i {0}; i < 3; ++i) {
+      auto result {measured_run(algorithm_run_func,
+                                instance.matrix,
+                                graph_info_as,
+                                std::optional {instance.optimal.cost},
+                                std::forward<Params>(algo_params)...)};
+      if (error::handle(result) == tsp::State::ERROR) {
+        return tsp::ErrorMeasure::ALGORITHM_ERROR;
+      }
+      cache_runs.at(i) = std::move(std::get<tsp::Result>(result));
+    }
+
+    if (verbose) {
+      fmt::print("[");
+    }
+
+    for (int i {0}; i < 10; ++i) {
+      auto result_ {measured_run(algorithm_run_func,
+                                 instance.matrix,
+                                 graph_info_as,
+                                 std::optional {instance.optimal.cost},
+                                 std::forward<Params>(algo_params)...)};
+      if (error::handle(result_) == tsp::State::ERROR) [[unlikely]] {
+        return tsp::ErrorMeasure::ALGORITHM_ERROR;
+      }
+
+      runs.at(i) = std::move(std::get<tsp::Result>(result_));
+
+      if (verbose) {
+        fmt::print("-");
+      }
+    }
+
+    if (verbose) {
+      fmt::println("]");
+    }
+
+    const std::string instance_name {instance.input_file.filename().string()};
+    const int         optimal_cost {instance.optimal.cost};
+    for (const tsp::Result& run : runs) {
+      const int         cost {run.solution.cost};
+      const std::string time_us {
+        fmt::format("{:.2f}", run.time.count() / 1000.)};
+
+      file_as << fmt::format("{};{};{};{}\n",
+                             instance_name,
+                             optimal_cost,
+                             cost,
+                             time_us);
+    }
+  }
+}
+
+static std::optional<tsp::ErrorMeasure> nearest_neighbour(
+bool verbose) noexcept {
+  if (verbose) {
+    fmt::print("---\nMeasuring Nearest Neighbour\n");
+  }
+
+  std::optional<tsp::ErrorMeasure> err {std::nullopt};
+
+  err =
+  z1z2_measure_trivial_symmetric(nn::run, 20, verbose, "./measure_nn_s.csv");
+  if (err.has_value()) {
+    return err;
+  }
+  err =
+  z1z2_measure_trivial_asymmetric(nn::run, 19, verbose, "./measure_nn_as.csv");
+  if (err.has_value()) {
+    return err;
+  }
+
+  if (verbose) {
+    fmt::print("OK\n");
+  } else {
+    fmt::print("NN: DONE\n");
+  }
+  return std::nullopt;
+}
+
+static std::optional<tsp::ErrorMeasure> brute_force(bool verbose) noexcept {
+  if (verbose) {
+    fmt::print("---\nMeasuring Brute Force\n");
+  }
+
+  std::optional<tsp::ErrorMeasure> err {std::nullopt};
+
+  err =
+  z1z2_measure_trivial_symmetric(bf::run, 11, verbose, "./measure_bf_s.csv");
+  if (err.has_value()) {
+    return err;
+  }
+  err =
+  z1z2_measure_trivial_asymmetric(bf::run, 12, verbose, "./measure_bf_as.csv");
+  if (err.has_value()) {
+    return err;
+  }
+
+  if (verbose) {
+    fmt::print("OK\n");
+  } else {
+    fmt::print("BF: DONE\n");
+  }
+  return std::nullopt;
+}
+
+static std::optional<tsp::ErrorMeasure> random(bool verbose) noexcept {
+  if (verbose) {
+    fmt::print("---\nMeasuring Random\n");
+  }
+
+  std::optional<tsp::ErrorMeasure> err {std::nullopt};
+
+  err =
+  z1z2_measure_trivial_symmetric(bf::run, 20, verbose, "./measure_r_s.csv", 4000);
+  if (err.has_value()) {
+    return err;
+  }
+  err =
+  z1z2_measure_trivial_asymmetric(bf::run, 19, verbose, "./measure_r_as.csv", 4000);
+  if (err.has_value()) {
+    return err;
+  }
+
+  if (verbose) {
+    fmt::print("OK\n");
+  } else {
+    fmt::print("R: DONE\n");
+  }
+  return std::nullopt;
+}
+
+static std::optional<tsp::ErrorMeasure> bxb_least_cost(bool verbose) noexcept {
+  if (verbose) {
+    fmt::print("---\nMeasuring BxB Least Cost\n");
+  }
+
+  std::optional<tsp::ErrorMeasure> err {std::nullopt};
+
+  err = z1z2_measure_trivial_symmetric(bxb::lc::run,
+                                       16,
+                                       verbose,
+                                       "./measure_lc_s.csv");
+  if (err.has_value()) {
+    return err;
+  }
+  err = z1z2_measure_trivial_asymmetric(bxb::lc::run,
+                                        18,
+                                        verbose,
+                                        "./measure_lc_as.csv");
+  if (err.has_value()) {
+    return err;
+  }
+
+  if (verbose) {
+    fmt::print("OK\n");
+  } else {
+    fmt::print("LC: DONE\n");
+  }
+  return std::nullopt;
+}
+
+static std::optional<tsp::ErrorMeasure> bxb_bfs(bool verbose) noexcept {
+  if (verbose) {
+    fmt::print("---\nMeasuring BxB Breadth First Search\n");
+  }
+
+  std::optional<tsp::ErrorMeasure> err {std::nullopt};
+
+  err = z1z2_measure_trivial_symmetric(bxb::bfs::run,
+                                       14,
+                                       verbose,
+                                       "./measure_bb_s.csv");
+  if (err.has_value()) {
+    return err;
+  }
+  err = z1z2_measure_trivial_asymmetric(bxb::bfs::run,
+                                        17,
+                                        verbose,
+                                        "./measure_bb_as.csv");
+  if (err.has_value()) {
+    return err;
+  }
+
+  if (verbose) {
+    fmt::print("OK\n");
+  } else {
+    fmt::print("BB: DONE\n");
+  }
+  return std::nullopt;
+}
+
+static std::optional<tsp::ErrorMeasure> bxb_dfs(bool verbose) noexcept {
+  if (verbose) {
+    fmt::print("---\nMeasuring BxB Depth First Search\n");
+  }
+
+  std::optional<tsp::ErrorMeasure> err {std::nullopt};
+
+  err = z1z2_measure_trivial_symmetric(bxb::dfs::run,
+                                       19,
+                                       verbose,
+                                       "./measure_bd_s.csv");
+  if (err.has_value()) {
+    return err;
+  }
+  err = z1z2_measure_trivial_asymmetric(bxb::dfs::run,
+                                        17,
+                                        verbose,
+                                        "./measure_bd_as.csv");
+  if (err.has_value()) {
+    return err;
+  }
+
+  if (verbose) {
+    fmt::print("OK\n");
+  } else {
+    fmt::print("BD: DONE\n");
+  }
+  return std::nullopt;
+}
+
+static std::optional<tsp::ErrorMeasure> tabu_search(bool verbose) noexcept {
+  if (verbose) {
+    fmt::print("---\nMeasuring Tabu Search\n");
+  }
+
+  if (verbose) {
+    fmt::print("OK\n");
+  } else {
+    fmt::print("TS: DONE\n");
+  }
+  return std::nullopt;
+}
+
+static std::optional<tsp::ErrorMeasure> genetic(bool verbose) noexcept {
+  if (verbose) {
+    fmt::print("---\nMeasuring Genetic\n");
+  }
+
+  if (verbose) {
+    fmt::print("OK\n");
+  } else {
+    fmt::print("G: DONE\n");
+  }
+  return std::nullopt;
+}
+
+std::variant<std::monostate, tsp::ErrorMeasure> execute_measurements(
+const tsp::MeasuringRun& run) noexcept {
+  std::optional<tsp::ErrorMeasure> err {std::nullopt};
+
+  for (const auto& algo : run.algorithms) {
+    switch (algo) {
+      case tsp::Algorithm::NEAREST_NEIGHBOUR:
+        err = measure::nearest_neighbour(run.verbose);
+        break;
+      case tsp::Algorithm::BRUTE_FORCE:
+        err = measure::brute_force(run.verbose);
+        break;
+      case tsp::Algorithm::RANDOM:
+        err = measure::random(run.verbose);
+        break;
+      case tsp::Algorithm::BXB_LEAST_COST:
+        err = measure::bxb_least_cost(run.verbose);
+        break;
+      case tsp::Algorithm::BXB_BFS:
+        err = measure::bxb_bfs(run.verbose);
+        break;
+      case tsp::Algorithm::BXB_DFS:
+        err = measure::bxb_dfs(run.verbose);
+        break;
+      case tsp::Algorithm::TABU_SEARCH:
+        err = measure::tabu_search(run.verbose);
+        break;
+      case tsp::Algorithm::GENETIC:
+        err = measure::genetic(run.verbose);
+        break;
+      default:
+        break;
+    }
+
+    if (err.has_value()) {
+      return *err;
+    }
+  }
+
+  return std::monostate {};
 }
 
 }    // namespace util::measure
