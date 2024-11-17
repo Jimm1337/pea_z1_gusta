@@ -547,12 +547,17 @@ const char** argv) noexcept {
 namespace util::measure {
 
 template<typename AlgoRun, typename... Params>
+requires std::invocable<AlgoRun,
+                        const tsp::Matrix<int>&,
+                        const tsp::GraphInfo&,
+                        const std::optional<int>&,
+                        Params...>
 static std::optional<tsp::ErrorMeasure> z1z2_measure_trivial_symmetric(
 AlgoRun     algorithm_run_func,
 int         max_v,
 bool        verbose,
 const char* out,
-Params&&... algo_params) noexcept {
+Params... algo_params) noexcept {
   const tsp::GraphInfo graph_info_s {true, true};
 
   std::ofstream file_s {out};
@@ -586,7 +591,7 @@ Params&&... algo_params) noexcept {
                                 instance.matrix,
                                 graph_info_s,
                                 std::optional {instance.optimal.cost},
-                                std::forward<Params>(algo_params)...)};
+                                algo_params...)};
       if (error::handle(result) == tsp::State::ERROR) {
         return tsp::ErrorMeasure::ALGORITHM_ERROR;
       }
@@ -602,7 +607,7 @@ Params&&... algo_params) noexcept {
                                  instance.matrix,
                                  graph_info_s,
                                  std::optional {instance.optimal.cost},
-                                 std::forward<Params>(algo_params)...)};
+                                 algo_params...)};
       if (error::handle(result_) == tsp::State::ERROR) [[unlikely]] {
         return tsp::ErrorMeasure::ALGORITHM_ERROR;
       }
@@ -635,12 +640,17 @@ Params&&... algo_params) noexcept {
 }
 
 template<typename AlgoRun, typename... Params>
+requires std::invocable<AlgoRun,
+                        const tsp::Matrix<int>&,
+                        const tsp::GraphInfo&,
+                        const std::optional<int>&,
+                        Params...>
 static std::optional<tsp::ErrorMeasure> z1z2_measure_trivial_asymmetric(
 AlgoRun     algorithm_run_func,
 int         max_v,
 bool        verbose,
 const char* out,
-Params&&... algo_params) noexcept {
+Params... algo_params) noexcept {
   const tsp::GraphInfo graph_info_as {false, false};
 
   std::ofstream file_as {out};
@@ -674,7 +684,7 @@ Params&&... algo_params) noexcept {
                                 instance.matrix,
                                 graph_info_as,
                                 std::optional {instance.optimal.cost},
-                                std::forward<Params>(algo_params)...)};
+                                algo_params...)};
       if (error::handle(result) == tsp::State::ERROR) {
         return tsp::ErrorMeasure::ALGORITHM_ERROR;
       }
@@ -690,7 +700,7 @@ Params&&... algo_params) noexcept {
                                  instance.matrix,
                                  graph_info_as,
                                  std::optional {instance.optimal.cost},
-                                 std::forward<Params>(algo_params)...)};
+                                 algo_params...)};
       if (error::handle(result_) == tsp::State::ERROR) [[unlikely]] {
         return tsp::ErrorMeasure::ALGORITHM_ERROR;
       }
@@ -782,13 +792,19 @@ static std::optional<tsp::ErrorMeasure> random(bool verbose) noexcept {
 
   std::optional<tsp::ErrorMeasure> err {std::nullopt};
 
-  err =
-  z1z2_measure_trivial_symmetric(bf::run, 20, verbose, "./measure_r_s.csv", 4000);
+  err = z1z2_measure_trivial_symmetric(random::run,
+                                       20,
+                                       verbose,
+                                       "./measure_r_s.csv",
+                                       4000);
   if (err.has_value()) {
     return err;
   }
-  err =
-  z1z2_measure_trivial_asymmetric(bf::run, 19, verbose, "./measure_r_as.csv", 4000);
+  err = z1z2_measure_trivial_asymmetric(random::run,
+                                        19,
+                                        verbose,
+                                        "./measure_r_as.csv",
+                                        4000);
   if (err.has_value()) {
     return err;
   }
