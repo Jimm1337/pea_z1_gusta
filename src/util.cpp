@@ -732,6 +732,389 @@ Params... algo_params) noexcept {
   }
 }
 
+struct Z3MeasureInstance {
+  std::filesystem::path name;
+  tsp::Matrix<int>      matrix;
+  tsp::GraphInfo        graph_info;
+  std::optional<int>    optimal_cost;
+  std::optional<int>    calc_tabu_itr;
+  std::optional<int>    calc_itr;
+};
+
+template<typename Itr>
+requires std::forward_iterator<Itr> &&
+         std::is_same_v<
+         std::remove_cvref_t<typename std::iterator_traits<Itr>::value_type>,
+         Z3MeasureInstance> &&
+         !std::is_const_v<typename std::iterator_traits<Itr>::value_type>
+         static std::optional<tsp::ErrorMeasure> z3_measure_itr_impact(
+         Itr         begin,
+         Itr         end,
+         int         min_itr,
+         int         max_itr,
+         int         step,
+         bool        verbose,
+         const char* out) noexcept {
+  std::ofstream file {out};
+
+  if (!file.is_open()) {
+    return tsp::ErrorMeasure::FILE_ERROR;
+  }
+
+  file
+  << "Nazwa;Koszt optymalny;Koszt obliczony;Ilosc iteracji w tabu;Ilosc iteracji;Czas [us];Blad [%]\n";
+
+  for (Itr it {begin}; it != end; ++it) {
+    double last_percent {100.};
+
+    for (int i {min_itr}; i <= max_itr; i += step) {
+      if (verbose) {
+        fmt::print("Tabu Search (Itr)  [{:<20}] {:>5}: ",
+                   it->name.stem().string(),
+                   i);
+      }
+
+      std::array<tsp::Result, 2> cache_runs {};
+      std::array<tsp::Result, 5> runs {};
+
+      for (int j {0}; j < 2; ++j) {
+        auto result {measured_run(ts::run,
+                                  it->matrix,
+                                  it->graph_info,
+                                  it->optimal_cost,
+                                  i,
+                                  i,
+                                  *it->calc_tabu_itr)};
+        if (error::handle(result) == tsp::State::ERROR) {
+          return tsp::ErrorMeasure::ALGORITHM_ERROR;
+        }
+        cache_runs.at(j) = std::move(std::get<tsp::Result>(result));
+      }
+
+      if (verbose) {
+        fmt::print("[");
+      }
+
+      for (int j {0}; j < 5; ++j) {
+        auto result_ {measured_run(ts::run,
+                                   it->matrix,
+                                   it->graph_info,
+                                   it->optimal_cost,
+                                   i,
+                                   i,
+                                   *it->calc_tabu_itr)};
+        if (error::handle(result_) == tsp::State::ERROR) [[unlikely]] {
+          return tsp::ErrorMeasure::ALGORITHM_ERROR;
+        }
+
+        runs.at(j) = std::move(std::get<tsp::Result>(result_));
+
+        if (verbose) {
+          fmt::print("-");
+        }
+      }
+
+      if (verbose) {
+        fmt::println("]");
+      }
+
+      const std::string instance_name {it->name.stem().string()};
+      const int         optimal_cost {it->optimal_cost.value()};
+      const int         cost {runs.at(0).solution.cost};
+      const int         tabu_itr {*it->calc_tabu_itr};
+      const double      error_percent {runs.at(0).error_info->relative_percent};
+
+      if (last_percent - error_percent > 0.1) {
+        last_percent = error_percent;
+        it->calc_itr = i;
+      }
+
+      for (const tsp::Result& run : runs) {
+        const std::string time_us {
+          fmt::format("{:.2f}", run.time.count() / 1000.)};
+
+        file << fmt::format("{};{};{};{};{};{};{:.2f}\n",
+                            instance_name,
+                            optimal_cost,
+                            cost,
+                            tabu_itr,
+                            i,
+                            time_us,
+                            error_percent);
+      }
+    }
+  }
+}
+
+template<typename Itr>
+requires std::forward_iterator<Itr> &&
+         std::is_same_v<
+         std::remove_cvref_t<typename std::iterator_traits<Itr>::value_type>,
+         Z3MeasureInstance> &&
+         !std::is_const_v<typename std::iterator_traits<Itr>::value_type>
+         static std::optional<tsp::ErrorMeasure> z3_measure_tabu_impact(
+         Itr         begin,
+         Itr         end,
+         int         min_tabu,
+         int         max_tabu,
+         int         step,
+         int         itr,
+         bool        verbose,
+         const char* out) noexcept {
+  std::ofstream file {out};
+
+  if (!file.is_open()) {
+    return tsp::ErrorMeasure::FILE_ERROR;
+  }
+
+  file
+  << "Nazwa;Koszt optymalny;Koszt obliczony;Ilosc iteracji w tabu;Ilosc iteracji;Czas [us];Blad [%]\n";
+
+  for (Itr it {begin}; it != end; ++it) {
+    double last_percent {100.};
+
+    for (int i {min_tabu}; i <= max_tabu; i += step) {
+      if (verbose) {
+        fmt::print("Tabu Search (Tabu) [{:<20}] {:>5}: ",
+                   it->name.stem().string(),
+                   i);
+      }
+
+      std::array<tsp::Result, 2> cache_runs {};
+      std::array<tsp::Result, 5> runs {};
+
+      for (int j {0}; j < 2; ++j) {
+        auto result {measured_run(ts::run,
+                                  it->matrix,
+                                  it->graph_info,
+                                  it->optimal_cost,
+                                  itr,
+                                  itr,
+                                  i)};
+        if (error::handle(result) == tsp::State::ERROR) {
+          return tsp::ErrorMeasure::ALGORITHM_ERROR;
+        }
+        cache_runs.at(j) = std::move(std::get<tsp::Result>(result));
+      }
+
+      if (verbose) {
+        fmt::print("[");
+      }
+
+      for (int j {0}; j < 5; ++j) {
+        auto result_ {measured_run(ts::run,
+                                   it->matrix,
+                                   it->graph_info,
+                                   it->optimal_cost,
+                                   itr,
+                                   itr,
+                                   i)};
+        if (error::handle(result_) == tsp::State::ERROR) [[unlikely]] {
+          return tsp::ErrorMeasure::ALGORITHM_ERROR;
+        }
+
+        runs.at(j) = std::move(std::get<tsp::Result>(result_));
+
+        if (verbose) {
+          fmt::print("-");
+        }
+      }
+
+      if (verbose) {
+        fmt::println("]");
+      }
+
+      const std::string instance_name {it->name.stem().string()};
+      const int         optimal_cost {it->optimal_cost.value()};
+      const int         cost {runs.at(0).solution.cost};
+      const int         tabu_itr {i};
+      const double      error_percent {runs.at(0).error_info->relative_percent};
+
+      if (last_percent - error_percent > 0.1) {
+        last_percent      = error_percent;
+        it->calc_tabu_itr = i;
+      }
+
+      for (const tsp::Result& run : runs) {
+        const std::string time_us {
+          fmt::format("{:.2f}", run.time.count() / 1000.)};
+
+        file << fmt::format("{};{};{};{};{};{};{:.2f}\n",
+                            instance_name,
+                            optimal_cost,
+                            cost,
+                            tabu_itr,
+                            itr,
+                            time_us,
+                            error_percent);
+      }
+    }
+  }
+}
+
+template<typename Itr>
+requires std::forward_iterator<Itr> &&
+         std::is_same_v<
+         std::remove_cvref_t<typename std::iterator_traits<Itr>::value_type>,
+         Z3MeasureInstance> &&
+         !std::is_const_v<typename std::iterator_traits<Itr>::value_type>
+         static std::optional<tsp::ErrorMeasure> z3_measure_n_impact(
+         Itr         begin,
+         Itr         end,
+         int         itr,
+         bool        verbose,
+         const char* out) noexcept {
+  std::ofstream file {out};
+
+  if (!file.is_open()) {
+    return tsp::ErrorMeasure::FILE_ERROR;
+  }
+
+  file
+  << "Ilosc miast;Nazwa;Koszt optymalny;Koszt obliczony;Ilosc iteracji w tabu;Ilosc iteracji;Czas [us];Blad [%]\n";
+
+  for (Itr it {begin}; it != end; ++it) {
+    if (verbose) {
+      fmt::print("Tabu Search (N)    [{:<20}] {:>5}: ",
+                 it->name.stem().string(), it->matrix.size());
+    }
+
+    std::array<tsp::Result, 3> cache_runs {};
+    std::array<tsp::Result, 7> runs {};
+
+    for (int j {0}; j < 3; ++j) {
+      auto result {measured_run(ts::run,
+                                it->matrix,
+                                it->graph_info,
+                                it->optimal_cost,
+                                itr,
+                                itr,
+                                *it->calc_tabu_itr)};
+      if (error::handle(result) == tsp::State::ERROR) {
+        return tsp::ErrorMeasure::ALGORITHM_ERROR;
+      }
+      cache_runs.at(j) = std::move(std::get<tsp::Result>(result));
+    }
+
+    if (verbose) {
+      fmt::print("[");
+    }
+
+    for (int j {0}; j < 7; ++j) {
+      auto result_ {measured_run(ts::run,
+                                 it->matrix,
+                                 it->graph_info,
+                                 it->optimal_cost,
+                                 itr,
+                                 itr,
+                                 *it->calc_tabu_itr)};
+      if (error::handle(result_) == tsp::State::ERROR) [[unlikely]] {
+        return tsp::ErrorMeasure::ALGORITHM_ERROR;
+      }
+
+      runs.at(j) = std::move(std::get<tsp::Result>(result_));
+
+      if (verbose) {
+        fmt::print("-");
+      }
+    }
+
+    if (verbose) {
+      fmt::println("]");
+    }
+
+    const std::string instance_name {it->name.stem().string()};
+    const int         optimal_cost {it->optimal_cost.value()};
+    const int         tabu_itr {*it->calc_tabu_itr};
+    const int         cost {runs.at(0).solution.cost};
+    const double      error_percent {runs.at(0).error_info->relative_percent};
+    const int         v_count {static_cast<int>(it->matrix.size())};
+
+    for (const tsp::Result& run : runs) {
+      const std::string time_us {
+        fmt::format("{:.2f}", run.time.count() / 1000.)};
+
+      file << fmt::format("{};{};{};{};{};{};{};{:.2f}\n",
+                          v_count,
+                          instance_name,
+                          optimal_cost,
+                          cost,
+                          tabu_itr,
+                          itr,
+                          time_us,
+                          error_percent);
+    }
+  }
+}
+
+template<size_t count, typename Itr>
+requires std::forward_iterator<Itr> &&
+         std::is_same_v<
+         std::remove_cvref_t<typename std::iterator_traits<Itr>::value_type>,
+         tsp::Instance>
+static std::optional<tsp::ErrorMeasure> z3_measure_all(
+Itr         begin,
+Itr         end,
+int         min_tabu,
+int         max_tabu,
+int         step_tabu,
+int         itr_tabu,
+int         min_itr,
+int         max_itr,
+int         step_itr,
+int         itr_n,
+bool        verbose,
+const char* out_tabu,
+const char* out_itr,
+const char* out_n) noexcept {
+  std::array<Z3MeasureInstance, count> instances {};
+
+  std::optional<tsp::ErrorMeasure> err {std::nullopt};
+
+  int i {0};
+  for (Itr it {begin}; it != end; ++it) {
+    instances.at(i).name          = std::move(it->input_file);
+    instances.at(i).matrix        = std::move(it->matrix);
+    instances.at(i).graph_info    = std::move(it->graph_info);
+    instances.at(i).optimal_cost  = it->optimal.cost;
+    instances.at(i).calc_tabu_itr = std::nullopt;
+    instances.at(i).calc_itr      = std::nullopt;
+
+    ++i;
+  }
+
+  err = z3_measure_tabu_impact(instances.begin(),
+                               instances.end(),
+                               min_tabu,
+                               max_tabu,
+                               step_tabu,
+                               itr_tabu,
+                               verbose,
+                               out_tabu);
+  if (err.has_value()) [[unlikely]] {
+    return err;
+  }
+
+  err = z3_measure_itr_impact(instances.begin(),
+                              instances.end(),
+                              min_itr,
+                              max_itr,
+                              step_itr,
+                              verbose,
+                              out_itr);
+  if (err.has_value()) [[unlikely]] {
+    return err;
+  }
+
+  err = z3_measure_n_impact(instances.begin(),
+                            instances.end(),
+                            itr_n,
+                            verbose,
+                            out_n);
+
+  return err;
+}
+
 static std::optional<tsp::ErrorMeasure> nearest_neighbour(
 bool verbose) noexcept {
   if (verbose) {
@@ -910,6 +1293,151 @@ static std::optional<tsp::ErrorMeasure> bxb_dfs(bool verbose) noexcept {
 static std::optional<tsp::ErrorMeasure> tabu_search(bool verbose) noexcept {
   if (verbose) {
     fmt::print("---\nMeasuring Tabu Search\n");
+  }
+
+  std::optional<tsp::ErrorMeasure> err {std::nullopt};
+
+  {
+    std::array<tsp::Instance, 11 - 5 + 1> symmetric_rand {};
+    for (int i {5}; i <= 11; ++i) {
+      auto instance_ {
+        config::read(fmt::format("./data/rand_tsp/configs/{}_rand_s.ini", i))};
+      if (error::handle(instance_) == tsp::State::ERROR) {
+        return tsp::ErrorMeasure::FILE_ERROR;
+      }
+      symmetric_rand.at(i - 5) = std::move(std::get<tsp::Instance>(instance_));
+    }
+
+    err = z3_measure_all<symmetric_rand.size()>(symmetric_rand.begin(),
+                                                symmetric_rand.end(),
+                                                6,
+                                                30,
+                                                2,
+                                                500,
+                                                50,
+                                                500,
+                                                25,
+                                                3000,
+                                                verbose,
+                                                "./measure_ts_tabu_rs.csv",
+                                                "./measure_ts_itr_rs.csv",
+                                                "./measure_ts_n_rs.csv");
+    if (err.has_value()) {
+      return err;
+    }
+  }
+
+  {
+    std::array<tsp::Instance, 12 - 5 + 1> asymmetric_rand {};
+    for (int i {5}; i <= 12; ++i) {
+      auto instance_ {config::read(
+      fmt::format("./data/rand_atsp/configs/{}_rand_as.ini", i))};
+      if (error::handle(instance_) == tsp::State::ERROR) {
+        return tsp::ErrorMeasure::FILE_ERROR;
+      }
+      asymmetric_rand.at(i - 5) = std::move(std::get<tsp::Instance>(instance_));
+    }
+
+    err = z3_measure_all<asymmetric_rand.size()>(asymmetric_rand.begin(),
+                                                 asymmetric_rand.end(),
+                                                 6,
+                                                 30,
+                                                 2,
+                                                 500,
+                                                 50,
+                                                 500,
+                                                 25,
+                                                 3000,
+                                                 verbose,
+                                                 "./measure_ts_tabu_ra.csv",
+                                                 "./measure_ts_itr_ra.csv",
+                                                 "./measure_ts_n_ra.csv");
+    if (err.has_value()) {
+      return err;
+    }
+  }
+
+  {
+    std::array<tsp::Instance, 7> tsplib_symmetric {};
+
+    const std::array configs {
+      "./data/tsplib_tsp/configs/127_bier127.ini",
+      "./data/tsplib_tsp/configs/159_u159.ini",
+      "./data/tsplib_tsp/configs/180_brg180.ini",
+      "./data/tsplib_tsp/configs/225_tsp225.ini",
+      "./data/tsplib_tsp/configs/264_pr264.ini",
+      "./data/tsplib_tsp/configs/299_pr299.ini",
+      "./data/tsplib_tsp/configs/318_linhp318.ini",
+    };
+
+    int i {0};
+    for (const auto& config : configs) {
+      auto instance_ {config::read(config)};
+      if (error::handle(instance_) == tsp::State::ERROR) {
+        return tsp::ErrorMeasure::FILE_ERROR;
+      }
+      tsplib_symmetric.at(i) = std::move(std::get<tsp::Instance>(instance_));
+      ++i;
+    }
+
+    err = z3_measure_all<tsplib_symmetric.size()>(tsplib_symmetric.begin(),
+                                                  tsplib_symmetric.end(),
+                                                  10,
+                                                  40,
+                                                  2,
+                                                  1000,
+                                                  100,
+                                                  1000,
+                                                  100,
+                                                  3000,
+                                                  verbose,
+                                                  "./measure_ts_tabu_libs.csv",
+                                                  "./measure_ts_itr_libs.csv",
+                                                  "./measure_ts_n_libs.csv");
+    if (err.has_value()) {
+      return err;
+    }
+  }
+
+  {
+    std::array<tsp::Instance, 6> tsplib_asymmetric {};
+
+    const std::array configs {
+      "./data/tsplib_atsp/configs/34_ftv33.ini",
+      "./data/tsplib_atsp/configs/43_p43.ini",
+      "./data/tsplib_atsp/configs/53_ft53.ini",
+      "./data/tsplib_atsp/configs/65_ftv64.ini",
+      "./data/tsplib_atsp/configs/71_ftv70.ini",
+      "./data/tsplib_atsp/configs/100_kro124p.ini",
+    };
+
+    int i{0};
+    for (const auto& config : configs) {
+      auto instance_ {config::read(config)};
+      if (error::handle(instance_) == tsp::State::ERROR) {
+        return tsp::ErrorMeasure::FILE_ERROR;
+      }
+      tsplib_asymmetric.at(i) = std::move(std::get<tsp::Instance>(instance_));
+      ++i;
+    }
+
+    err = z3_measure_all<tsplib_asymmetric.size()>(tsplib_asymmetric.begin(),
+                                                   tsplib_asymmetric.end(),
+                                                   10,
+                                                   40,
+                                                   2,
+                                                   1000,
+                                                   100,
+                                                   1000,
+                                                   100,
+                                                   3000,
+                                                   verbose,
+                                                   "./measure_ts_tabu_liba.csv",
+                                                   "./measure_ts_itr_liba.csv",
+                                                   "./measure_ts_n_liba.csv");
+    if (err.has_value()) {
+      return err;
+    }
   }
 
   if (verbose) {
