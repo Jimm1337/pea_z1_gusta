@@ -637,6 +637,8 @@ Params... algo_params) noexcept {
                             time_us);
     }
   }
+
+  return std::nullopt;
 }
 
 template<typename AlgoRun, typename... Params>
@@ -730,6 +732,8 @@ Params... algo_params) noexcept {
                              time_us);
     }
   }
+
+  return std::nullopt;
 }
 
 struct Z3MeasureInstance {
@@ -762,7 +766,7 @@ requires std::forward_iterator<Itr> &&
   }
 
   file
-  << "Nazwa;Koszt optymalny;Koszt obliczony;Ilosc iteracji w tabu;Ilosc iteracji;Czas [us];Blad [%]\n";
+  << "Ilosc miast;Nazwa;Koszt optymalny;Koszt obliczony;Ilosc iteracji w tabu;Ilosc iteracji;Czas [us];Blad [%]\n";
 
   for (Itr it {begin}; it != end; ++it) {
     double last_percent {100.};
@@ -823,6 +827,7 @@ requires std::forward_iterator<Itr> &&
       const int         cost {runs.at(0).solution.cost};
       const int         tabu_itr {*it->calc_tabu_itr};
       const double      error_percent {runs.at(0).error_info->relative_percent};
+      const int         v_count {static_cast<int>(it->matrix.size())};
 
       if (last_percent - error_percent > 0.1) {
         last_percent = error_percent;
@@ -833,7 +838,8 @@ requires std::forward_iterator<Itr> &&
         const std::string time_us {
           fmt::format("{:.2f}", run.time.count() / 1000.)};
 
-        file << fmt::format("{};{};{};{};{};{};{:.2f}\n",
+        file << fmt::format("{};{};{};{};{};{};{};{:.2f}\n",
+                            v_count,
                             instance_name,
                             optimal_cost,
                             cost,
@@ -844,6 +850,8 @@ requires std::forward_iterator<Itr> &&
       }
     }
   }
+
+  return std::nullopt;
 }
 
 template<typename Itr>
@@ -868,7 +876,7 @@ requires std::forward_iterator<Itr> &&
   }
 
   file
-  << "Nazwa;Koszt optymalny;Koszt obliczony;Ilosc iteracji w tabu;Ilosc iteracji;Czas [us];Blad [%]\n";
+  << "Ilosc miast;Nazwa;Koszt optymalny;Koszt obliczony;Ilosc iteracji w tabu;Ilosc iteracji;Czas [us];Blad [%]\n";
 
   for (Itr it {begin}; it != end; ++it) {
     double last_percent {100.};
@@ -929,6 +937,7 @@ requires std::forward_iterator<Itr> &&
       const int         cost {runs.at(0).solution.cost};
       const int         tabu_itr {i};
       const double      error_percent {runs.at(0).error_info->relative_percent};
+      const int         v_count {static_cast<int>(it->matrix.size())};
 
       if (last_percent - error_percent > 0.1) {
         last_percent      = error_percent;
@@ -939,7 +948,8 @@ requires std::forward_iterator<Itr> &&
         const std::string time_us {
           fmt::format("{:.2f}", run.time.count() / 1000.)};
 
-        file << fmt::format("{};{};{};{};{};{};{:.2f}\n",
+        file << fmt::format("{};{};{};{};{};{};{};{:.2f}\n",
+                            v_count,
                             instance_name,
                             optimal_cost,
                             cost,
@@ -950,6 +960,8 @@ requires std::forward_iterator<Itr> &&
       }
     }
   }
+
+  return std::nullopt;
 }
 
 template<typename Itr>
@@ -976,7 +988,8 @@ requires std::forward_iterator<Itr> &&
   for (Itr it {begin}; it != end; ++it) {
     if (verbose) {
       fmt::print("Tabu Search (N)    [{:<20}] {:>5}: ",
-                 it->name.stem().string(), it->matrix.size());
+                 it->name.stem().string(),
+                 it->matrix.size());
     }
 
     std::array<tsp::Result, 3> cache_runs {};
@@ -1045,6 +1058,8 @@ requires std::forward_iterator<Itr> &&
                           error_percent);
     }
   }
+
+  return std::nullopt;
 }
 
 template<size_t count, typename Itr>
@@ -1109,6 +1124,1040 @@ const char* out_n) noexcept {
   err = z3_measure_n_impact(instances.begin(),
                             instances.end(),
                             itr_n,
+                            verbose,
+                            out_n);
+
+  return err;
+}
+
+struct Z4MeasureInstance {
+  std::filesystem::path name;
+  tsp::Matrix<int>      matrix;
+  tsp::GraphInfo        graph_info;
+  std::optional<int>    optimal_cost;
+  std::optional<int>    calc_children_per_itr;
+  std::optional<int>    calc_population_size;
+  std::optional<int>    calc_max_children_per_pair;
+  std::optional<int>    calc_max_v_count_crossover;
+  std::optional<int>    calc_mutations_per_1000;
+};
+
+template<typename Itr>
+requires std::forward_iterator<Itr> &&
+         std::is_same_v<
+         std::remove_cvref_t<typename std::iterator_traits<Itr>::value_type>,
+         Z4MeasureInstance> &&
+         !std::is_const_v<typename std::iterator_traits<Itr>::value_type>
+         static std::optional<tsp::ErrorMeasure>
+         z4_measure_children_per_itr_impact(Itr         begin,
+                                            Itr         end,
+                                            int         itr,
+                                            int         min_children_per_itr,
+                                            int         max_children_per_itr,
+                                            int         step_children_per_itr,
+                                            int         population_size,
+                                            int         max_children_per_pair,
+                                            int         max_v_count_crossover,
+                                            int         mutations_per_1000,
+                                            bool        verbose,
+                                            const char* out) noexcept {
+  std::ofstream file {out};
+
+  if (!file.is_open()) {
+    return tsp::ErrorMeasure::FILE_ERROR;
+  }
+
+  file
+  << "Ilosc miast;Nazwa;Koszt optymalny;Koszt obliczony;Ilosc iteracji;Rozmiar populacji;Maks ilosc dzieci na iteracje;Maks dzieci na pare;Maks wierzcholkow krzyzowania;Szansa na mutacje [%];Czas [us];Blad [%]\n";
+
+  for (Itr it {begin}; it != end; ++it) {
+    double last_percent {100.};
+
+    for (int i {min_children_per_itr}; i <= max_children_per_itr;
+         i += step_children_per_itr) {
+      if (verbose) {
+        fmt::print("Genetic (CPI)     [{:<20}] {:>5}: ",
+                   it->name.stem().string(),
+                   i);
+      }
+
+      std::array<tsp::Result, 3>  cache_runs {};
+      std::array<tsp::Result, 10> runs {};
+
+      for (int j {0}; j < 3; ++j) {
+        auto result {measured_run(gen::run,
+                                  it->matrix,
+                                  it->graph_info,
+                                  it->optimal_cost,
+                                  itr,
+                                  population_size,
+                                  i,
+                                  max_children_per_pair,
+                                  max_v_count_crossover,
+                                  mutations_per_1000)};
+        if (error::handle(result) == tsp::State::ERROR) {
+          return tsp::ErrorMeasure::ALGORITHM_ERROR;
+        }
+        cache_runs.at(j) = std::move(std::get<tsp::Result>(result));
+      }
+
+      if (verbose) {
+        fmt::print("[");
+      }
+
+      for (int j {0}; j < 10; ++j) {
+        auto result_ {measured_run(gen::run,
+                                   it->matrix,
+                                   it->graph_info,
+                                   it->optimal_cost,
+                                   itr,
+                                   population_size,
+                                   i,
+                                   max_children_per_pair,
+                                   max_v_count_crossover,
+                                   mutations_per_1000)};
+        if (error::handle(result_) == tsp::State::ERROR) [[unlikely]] {
+          return tsp::ErrorMeasure::ALGORITHM_ERROR;
+        }
+
+        runs.at(j) = std::move(std::get<tsp::Result>(result_));
+
+        if (verbose) {
+          fmt::print("-");
+        }
+      }
+
+      if (verbose) {
+        fmt::println("]");
+      }
+
+      const int         v_count {static_cast<int>(it->matrix.size())};
+      const std::string instance_name {it->name.stem().string()};
+      const int         optimal_cost {it->optimal_cost.value()};
+      const int         itr_count {itr};
+      const int         pop_size {population_size};
+      const int         children_per_itr {i};
+      const int         children_per_pair {max_children_per_pair};
+      const int         v_count_crossover {max_v_count_crossover};
+      const int         mutations {mutations_per_1000};
+
+      for (const tsp::Result& run : runs) {
+        const int         cost {run.solution.cost};
+        const std::string time_us {
+          fmt::format("{:.2f}", run.time.count() / 1000.)};
+        const double error_percent {run.error_info->relative_percent};
+
+        if (last_percent - error_percent > 0.1) {
+          last_percent              = error_percent;
+          it->calc_children_per_itr = i;
+        }
+
+        file << fmt::format("{};{};{};{};{};{};{};{};{};{};{};{:.2f}\n",
+                            v_count,
+                            instance_name,
+                            optimal_cost,
+                            cost,
+                            itr_count,
+                            pop_size,
+                            children_per_itr,
+                            children_per_pair,
+                            v_count_crossover,
+                            mutations,
+                            time_us,
+                            error_percent);
+      }
+    }
+  }
+
+  return std::nullopt;
+}
+
+template<typename Itr>
+requires std::forward_iterator<Itr> &&
+         std::is_same_v<
+         std::remove_cvref_t<typename std::iterator_traits<Itr>::value_type>,
+         Z4MeasureInstance> &&
+         !std::is_const_v<typename std::iterator_traits<Itr>::value_type>
+         static std::optional<tsp::ErrorMeasure>
+         z4_measure_population_size_impact(Itr         begin,
+                                           Itr         end,
+                                           int         itr,
+                                           int         min_population_size,
+                                           int         max_population_size,
+                                           int         step_population_size,
+                                           int         max_children_per_pair,
+                                           int         max_v_count_crossover,
+                                           int         mutations_per_1000,
+                                           bool        verbose,
+                                           const char* out) noexcept {
+  std::ofstream file {out};
+
+  if (!file.is_open()) {
+    return tsp::ErrorMeasure::FILE_ERROR;
+  }
+
+  file
+  << "Ilosc miast;Nazwa;Koszt optymalny;Koszt obliczony;Ilosc iteracji;Rozmiar populacji;Maks ilosc dzieci na iteracje;Maks dzieci na pare;Maks wierzcholkow krzyzowania;Szansa na mutacje [%];Czas [us];Blad [%]\n";
+
+  for (Itr it {begin}; it != end; ++it) {
+    double last_percent {100.};
+
+    for (int i {min_population_size}; i <= max_population_size;
+         i += step_population_size) {
+      if (verbose) {
+        fmt::print("Genetic (Pop)     [{:<20}] {:>5}: ",
+                   it->name.stem().string(),
+                   i);
+      }
+
+      std::array<tsp::Result, 3>  cache_runs {};
+      std::array<tsp::Result, 10> runs {};
+
+      for (int j {0}; j < 3; ++j) {
+        auto result {measured_run(gen::run,
+                                  it->matrix,
+                                  it->graph_info,
+                                  it->optimal_cost,
+                                  itr,
+                                  i,
+                                  *it->calc_children_per_itr,
+                                  max_children_per_pair,
+                                  max_v_count_crossover,
+                                  mutations_per_1000)};
+        if (error::handle(result) == tsp::State::ERROR) {
+          return tsp::ErrorMeasure::ALGORITHM_ERROR;
+        }
+        cache_runs.at(j) = std::move(std::get<tsp::Result>(result));
+      }
+
+      if (verbose) {
+        fmt::print("[");
+      }
+
+      for (int j {0}; j < 10; ++j) {
+        auto result_ {measured_run(gen::run,
+                                   it->matrix,
+                                   it->graph_info,
+                                   it->optimal_cost,
+                                   itr,
+                                   i,
+                                   *it->calc_children_per_itr,
+                                   max_children_per_pair,
+                                   max_v_count_crossover,
+                                   mutations_per_1000)};
+        if (error::handle(result_) == tsp::State::ERROR) [[unlikely]] {
+          return tsp::ErrorMeasure::ALGORITHM_ERROR;
+        }
+
+        runs.at(j) = std::move(std::get<tsp::Result>(result_));
+
+        if (verbose) {
+          fmt::print("-");
+        }
+      }
+
+      if (verbose) {
+        fmt::println("]");
+      }
+
+      const int         v_count {static_cast<int>(it->matrix.size())};
+      const std::string instance_name {it->name.stem().string()};
+      const int         optimal_cost {it->optimal_cost.value()};
+      const int         itr_count {itr};
+      const int         pop_size {i};
+      const int         children_per_itr {*it->calc_children_per_itr};
+      const int         children_per_pair {max_children_per_pair};
+      const int         v_count_crossover {max_v_count_crossover};
+      const int         mutations {mutations_per_1000};
+
+      for (const tsp::Result& run : runs) {
+        const int         cost {run.solution.cost};
+        const std::string time_us {
+          fmt::format("{:.2f}", run.time.count() / 1000.)};
+        const double error_percent {run.error_info->relative_percent};
+
+        if (last_percent - error_percent > 0.1) {
+          last_percent             = error_percent;
+          it->calc_population_size = i;
+        }
+
+        file << fmt::format("{};{};{};{};{};{};{};{};{};{};{};{:.2f}\n",
+                            v_count,
+                            instance_name,
+                            optimal_cost,
+                            cost,
+                            itr_count,
+                            pop_size,
+                            children_per_itr,
+                            children_per_pair,
+                            v_count_crossover,
+                            mutations,
+                            time_us,
+                            error_percent);
+      }
+    }
+  }
+
+  return std::nullopt;
+}
+
+template<typename Itr>
+requires std::forward_iterator<Itr> &&
+         std::is_same_v<
+         std::remove_cvref_t<typename std::iterator_traits<Itr>::value_type>,
+         Z4MeasureInstance> &&
+         !std::is_const_v<typename std::iterator_traits<Itr>::value_type>
+         static std::optional<tsp::ErrorMeasure>
+         z4_measure_max_children_per_pair_impact(Itr begin,
+                                                 Itr end,
+                                                 int itr,
+                                                 int min_max_children_per_pair,
+                                                 int max_max_children_per_pair,
+                                                 int step_max_children_per_pair,
+                                                 int max_v_count_crossover,
+                                                 int mutations_per_1000,
+                                                 bool        verbose,
+                                                 const char* out) noexcept {
+  std::ofstream file {out};
+
+  if (!file.is_open()) {
+    return tsp::ErrorMeasure::FILE_ERROR;
+  }
+
+  file
+  << "Ilosc miast;Nazwa;Koszt optymalny;Koszt obliczony;Ilosc iteracji;Rozmiar populacji;Maks ilosc dzieci na iteracje;Maks dzieci na pare;Maks wierzcholkow krzyzowania;Szansa na mutacje [%];Czas [us];Blad [%]\n";
+
+  for (Itr it {begin}; it != end; ++it) {
+    double last_percent {100.};
+
+    for (int i {min_max_children_per_pair}; i <= max_max_children_per_pair;
+         i += step_max_children_per_pair) {
+      if (verbose) {
+        fmt::print("Genetic (CPP)     [{:<20}] {:>5}: ",
+                   it->name.stem().string(),
+                   i);
+      }
+
+      std::array<tsp::Result, 3>  cache_runs {};
+      std::array<tsp::Result, 10> runs {};
+
+      for (int j {0}; j < 3; ++j) {
+        auto result {measured_run(gen::run,
+                                  it->matrix,
+                                  it->graph_info,
+                                  it->optimal_cost,
+                                  itr,
+                                  *it->calc_population_size,
+                                  *it->calc_children_per_itr,
+                                  i,
+                                  max_v_count_crossover,
+                                  mutations_per_1000)};
+        if (error::handle(result) == tsp::State::ERROR) {
+          return tsp::ErrorMeasure::ALGORITHM_ERROR;
+        }
+        cache_runs.at(j) = std::move(std::get<tsp::Result>(result));
+      }
+
+      if (verbose) {
+        fmt::print("[");
+      }
+
+      for (int j {0}; j < 10; ++j) {
+        auto result_ {measured_run(gen::run,
+                                   it->matrix,
+                                   it->graph_info,
+                                   it->optimal_cost,
+                                   itr,
+                                   *it->calc_population_size,
+                                   *it->calc_children_per_itr,
+                                   i,
+                                   max_v_count_crossover,
+                                   mutations_per_1000)};
+        if (error::handle(result_) == tsp::State::ERROR) [[unlikely]] {
+          return tsp::ErrorMeasure::ALGORITHM_ERROR;
+        }
+
+        runs.at(j) = std::move(std::get<tsp::Result>(result_));
+
+        if (verbose) {
+          fmt::print("-");
+        }
+      }
+
+      if (verbose) {
+        fmt::println("]");
+      }
+
+      const int         v_count {static_cast<int>(it->matrix.size())};
+      const std::string instance_name {it->name.stem().string()};
+      const int         optimal_cost {it->optimal_cost.value()};
+      const int         itr_count {itr};
+      const int         pop_size {*it->calc_population_size};
+      const int         children_per_itr {*it->calc_children_per_itr};
+      const int         children_per_pair {i};
+      const int         v_count_crossover {max_v_count_crossover};
+      const int         mutations {mutations_per_1000};
+
+      for (const tsp::Result& run : runs) {
+        const int         cost {run.solution.cost};
+        const std::string time_us {
+          fmt::format("{:.2f}", run.time.count() / 1000.)};
+        const double error_percent {run.error_info->relative_percent};
+
+        if (last_percent - error_percent > 0.1) {
+          last_percent                   = error_percent;
+          it->calc_max_children_per_pair = i;
+        }
+
+        file << fmt::format("{};{};{};{};{};{};{};{};{};{};{};{:.2f}\n",
+                            v_count,
+                            instance_name,
+                            optimal_cost,
+                            cost,
+                            itr_count,
+                            pop_size,
+                            children_per_itr,
+                            children_per_pair,
+                            v_count_crossover,
+                            mutations,
+                            time_us,
+                            error_percent);
+      }
+    }
+  }
+
+  return std::nullopt;
+}
+
+template<typename Itr>
+requires std::forward_iterator<Itr> &&
+         std::is_same_v<
+         std::remove_cvref_t<typename std::iterator_traits<Itr>::value_type>,
+         Z4MeasureInstance> &&
+         !std::is_const_v<typename std::iterator_traits<Itr>::value_type>
+         static std::optional<tsp::ErrorMeasure>
+         z4_measure_max_v_count_crossover_impact(Itr begin,
+                                                 Itr end,
+                                                 int itr,
+                                                 int min_max_v_count_crossover,
+                                                 int max_max_v_count_crossover,
+                                                 int step_max_v_count_crossover,
+                                                 int mutations_per_1000,
+                                                 bool        verbose,
+                                                 const char* out) noexcept {
+  std::ofstream file {out};
+
+  if (!file.is_open()) {
+    return tsp::ErrorMeasure::FILE_ERROR;
+  }
+
+  file
+  << "Ilosc miast;Nazwa;Koszt optymalny;Koszt obliczony;Ilosc iteracji;Rozmiar populacji;Maks ilosc dzieci na iteracje;Maks dzieci na pare;Maks wierzcholkow krzyzowania;Szansa na mutacje [%];Czas [us];Blad [%]\n";
+
+  for (Itr it {begin}; it != end; ++it) {
+    double last_percent {100.};
+
+    for (int i {min_max_v_count_crossover}; i <= max_max_v_count_crossover;
+         i += step_max_v_count_crossover) {
+      if (verbose) {
+        fmt::print("Genetic (VCC)     [{:<20}] {:>5}: ",
+                   it->name.stem().string(),
+                   i);
+      }
+
+      std::array<tsp::Result, 3>  cache_runs {};
+      std::array<tsp::Result, 10> runs {};
+
+      for (int j {0}; j < 3; ++j) {
+        auto result {measured_run(gen::run,
+                                  it->matrix,
+                                  it->graph_info,
+                                  it->optimal_cost,
+                                  itr,
+                                  *it->calc_population_size,
+                                  *it->calc_children_per_itr,
+                                  *it->calc_max_children_per_pair,
+                                  i,
+                                  mutations_per_1000)};
+        if (error::handle(result) == tsp::State::ERROR) {
+          return tsp::ErrorMeasure::ALGORITHM_ERROR;
+        }
+        cache_runs.at(j) = std::move(std::get<tsp::Result>(result));
+      }
+
+      if (verbose) {
+        fmt::print("[");
+      }
+
+      for (int j {0}; j < 10; ++j) {
+        auto result_ {measured_run(gen::run,
+                                   it->matrix,
+                                   it->graph_info,
+                                   it->optimal_cost,
+                                   itr,
+                                   *it->calc_population_size,
+                                   *it->calc_children_per_itr,
+                                   *it->calc_max_children_per_pair,
+                                   i,
+                                   mutations_per_1000)};
+        if (error::handle(result_) == tsp::State::ERROR) [[unlikely]] {
+          return tsp::ErrorMeasure::ALGORITHM_ERROR;
+        }
+
+        runs.at(j) = std::move(std::get<tsp::Result>(result_));
+
+        if (verbose) {
+          fmt::print("-");
+        }
+      }
+
+      if (verbose) {
+        fmt::println("]");
+      }
+
+      const int         v_count {static_cast<int>(it->matrix.size())};
+      const std::string instance_name {it->name.stem().string()};
+      const int         optimal_cost {it->optimal_cost.value()};
+      const int         itr_count {itr};
+      const int         pop_size {*it->calc_population_size};
+      const int         children_per_itr {*it->calc_children_per_itr};
+      const int         children_per_pair {*it->calc_max_children_per_pair};
+      const int         v_count_crossover {i};
+      const int         mutations {mutations_per_1000};
+
+      for (const tsp::Result& run : runs) {
+        const int         cost {run.solution.cost};
+        const std::string time_us {
+          fmt::format("{:.2f}", run.time.count() / 1000.)};
+        const double error_percent {run.error_info->relative_percent};
+
+        if (last_percent - error_percent > 0.1) {
+          last_percent                   = error_percent;
+          it->calc_max_v_count_crossover = i;
+        }
+
+        file << fmt::format("{};{};{};{};{};{};{};{};{};{};{};{:.2f}\n",
+                            v_count,
+                            instance_name,
+                            optimal_cost,
+                            cost,
+                            itr_count,
+                            pop_size,
+                            children_per_itr,
+                            children_per_pair,
+                            v_count_crossover,
+                            mutations,
+                            time_us,
+                            error_percent);
+      }
+    }
+  }
+
+  return std::nullopt;
+}
+
+template<typename Itr>
+requires std::forward_iterator<Itr> &&
+         std::is_same_v<
+         std::remove_cvref_t<typename std::iterator_traits<Itr>::value_type>,
+         Z4MeasureInstance> &&
+         !std::is_const_v<typename std::iterator_traits<Itr>::value_type>
+         static std::optional<tsp::ErrorMeasure>
+         z4_measure_mutations_per_1000_impact(Itr  begin,
+                                              Itr  end,
+                                              int  itr,
+                                              int  min_mutations_per_1000,
+                                              int  max_mutations_per_1000,
+                                              int  step_mutations_per_1000,
+                                              bool verbose,
+                                              const char* out) noexcept {
+  std::ofstream file {out};
+
+  if (!file.is_open()) {
+    return tsp::ErrorMeasure::FILE_ERROR;
+  }
+
+  file
+  << "Ilosc miast;Nazwa;Koszt optymalny;Koszt obliczony;Ilosc iteracji;Rozmiar populacji;Maks ilosc dzieci na iteracje;Maks dzieci na pare;Maks wierzcholkow krzyzowania;Szansa na mutacje [%];Czas [us];Blad [%]\n";
+
+  for (Itr it {begin}; it != end; ++it) {
+    double last_percent {100.};
+
+    for (int i {min_mutations_per_1000}; i <= max_mutations_per_1000;
+         i += step_mutations_per_1000) {
+      if (verbose) {
+        fmt::print("Genetic (Mut)     [{:<20}] {:>5}: ",
+                   it->name.stem().string(),
+                   i);
+      }
+
+      std::array<tsp::Result, 3>  cache_runs {};
+      std::array<tsp::Result, 10> runs {};
+
+      for (int j {0}; j < 3; ++j) {
+        auto result {measured_run(gen::run,
+                                  it->matrix,
+                                  it->graph_info,
+                                  it->optimal_cost,
+                                  itr,
+                                  *it->calc_population_size,
+                                  *it->calc_children_per_itr,
+                                  *it->calc_max_children_per_pair,
+                                  *it->calc_max_v_count_crossover,
+                                  i)};
+        if (error::handle(result) == tsp::State::ERROR) {
+          return tsp::ErrorMeasure::ALGORITHM_ERROR;
+        }
+        cache_runs.at(j) = std::move(std::get<tsp::Result>(result));
+      }
+
+      if (verbose) {
+        fmt::print("[");
+      }
+
+      for (int j {0}; j < 10; ++j) {
+        auto result_ {measured_run(gen::run,
+                                   it->matrix,
+                                   it->graph_info,
+                                   it->optimal_cost,
+                                   itr,
+                                   *it->calc_population_size,
+                                   *it->calc_children_per_itr,
+                                   *it->calc_max_children_per_pair,
+                                   *it->calc_max_v_count_crossover,
+                                   i)};
+        if (error::handle(result_) == tsp::State::ERROR) [[unlikely]] {
+          return tsp::ErrorMeasure::ALGORITHM_ERROR;
+        }
+
+        runs.at(j) = std::move(std::get<tsp::Result>(result_));
+
+        if (verbose) {
+          fmt::print("-");
+        }
+      }
+
+      if (verbose) {
+        fmt::println("]");
+      }
+
+      const int         v_count {static_cast<int>(it->matrix.size())};
+      const std::string instance_name {it->name.stem().string()};
+      const int         optimal_cost {it->optimal_cost.value()};
+      const int         itr_count {itr};
+      const int         pop_size {*it->calc_population_size};
+      const int         children_per_itr {*it->calc_children_per_itr};
+      const int         children_per_pair {*it->calc_max_children_per_pair};
+      const int         v_count_crossover {*it->calc_max_v_count_crossover};
+      const int         mutations {i};
+
+      for (const tsp::Result& run : runs) {
+        const int         cost {run.solution.cost};
+        const std::string time_us {
+          fmt::format("{:.2f}", run.time.count() / 1000.)};
+        const double error_percent {run.error_info->relative_percent};
+
+        if (last_percent - error_percent > 0.1) {
+          last_percent                = error_percent;
+          it->calc_mutations_per_1000 = i;
+        }
+
+        file << fmt::format("{};{};{};{};{};{};{};{};{};{};{};{:.2f}\n",
+                            v_count,
+                            instance_name,
+                            optimal_cost,
+                            cost,
+                            itr_count,
+                            pop_size,
+                            children_per_itr,
+                            children_per_pair,
+                            v_count_crossover,
+                            mutations,
+                            time_us,
+                            error_percent);
+      }
+    }
+  }
+
+  return std::nullopt;
+}
+
+template<typename Itr>
+requires std::forward_iterator<Itr> &&
+         std::is_same_v<
+         std::remove_cvref_t<typename std::iterator_traits<Itr>::value_type>,
+         Z4MeasureInstance>
+static std::optional<tsp::ErrorMeasure> z4_measure_itr_impact(
+Itr         begin,
+Itr         end,
+int         min_itr,
+int         max_itr,
+int         step_itr,
+bool        verbose,
+const char* out) noexcept {
+  std::ofstream file {out};
+
+  if (!file.is_open()) {
+    return tsp::ErrorMeasure::FILE_ERROR;
+  }
+
+  file
+  << "Ilosc miast;Nazwa;Koszt optymalny;Koszt obliczony;Ilosc iteracji;Rozmiar populacji;Maks ilosc dzieci na iteracje;Maks dzieci na pare;Maks wierzcholkow krzyzowania;Szansa na mutacje [%];Czas [us];Blad [%]\n";
+
+  for (Itr it {begin}; it != end; ++it) {
+    for (int i {min_itr}; i <= max_itr; i += step_itr) {
+      if (verbose) {
+        fmt::print("Genetic (Itr)     [{:<20}] {:>5}: ",
+                   it->name.stem().string(),
+                   i);
+      }
+
+      std::array<tsp::Result, 3>  cache_runs {};
+      std::array<tsp::Result, 10> runs {};
+
+      for (int j {0}; j < 3; ++j) {
+        auto result {measured_run(gen::run,
+                                  it->matrix,
+                                  it->graph_info,
+                                  it->optimal_cost,
+                                  i,
+                                  *it->calc_population_size,
+                                  *it->calc_children_per_itr,
+                                  *it->calc_max_children_per_pair,
+                                  *it->calc_max_v_count_crossover,
+                                  *it->calc_mutations_per_1000)};
+        if (error::handle(result) == tsp::State::ERROR) {
+          return tsp::ErrorMeasure::ALGORITHM_ERROR;
+        }
+        cache_runs.at(j) = std::move(std::get<tsp::Result>(result));
+      }
+
+      if (verbose) {
+        fmt::print("[");
+      }
+
+      for (int j {0}; j < 10; ++j) {
+        auto result_ {measured_run(gen::run,
+                                   it->matrix,
+                                   it->graph_info,
+                                   it->optimal_cost,
+                                   i,
+                                   *it->calc_population_size,
+                                   *it->calc_children_per_itr,
+                                   *it->calc_max_children_per_pair,
+                                   *it->calc_max_v_count_crossover,
+                                   *it->calc_mutations_per_1000)};
+        if (error::handle(result_) == tsp::State::ERROR) [[unlikely]] {
+          return tsp::ErrorMeasure::ALGORITHM_ERROR;
+        }
+
+        runs.at(j) = std::move(std::get<tsp::Result>(result_));
+
+        if (verbose) {
+          fmt::print("-");
+        }
+      }
+
+      if (verbose) {
+        fmt::println("]");
+      }
+
+      const int         v_count {static_cast<int>(it->matrix.size())};
+      const std::string instance_name {it->name.stem().string()};
+      const int         optimal_cost {it->optimal_cost.value()};
+      const int         itr_count {i};
+      const int         pop_size {*it->calc_population_size};
+      const int         children_per_itr {*it->calc_children_per_itr};
+      const int         children_per_pair {*it->calc_max_children_per_pair};
+      const int         v_count_crossover {*it->calc_max_v_count_crossover};
+      const int         mutations {*it->calc_mutations_per_1000};
+
+      for (const tsp::Result& run : runs) {
+        const int         cost {run.solution.cost};
+        const std::string time_us {
+          fmt::format("{:.2f}", run.time.count() / 1000.)};
+        const double error_percent {run.error_info->relative_percent};
+
+        file << fmt::format("{};{};{};{};{};{};{};{};{};{};{};{:.2f}\n",
+                            v_count,
+                            instance_name,
+                            optimal_cost,
+                            cost,
+                            itr_count,
+                            pop_size,
+                            children_per_itr,
+                            children_per_pair,
+                            v_count_crossover,
+                            mutations,
+                            time_us,
+                            error_percent);
+      }
+    }
+  }
+
+  return std::nullopt;
+}
+
+template<typename Itr>
+requires std::forward_iterator<Itr> &&
+         std::is_same_v<
+         std::remove_cvref_t<typename std::iterator_traits<Itr>::value_type>,
+         Z4MeasureInstance>
+static std::optional<tsp::ErrorMeasure> z4_measure_n_impact(
+Itr         begin,
+Itr         end,
+int         itr,
+int         population_size,
+int         children_per_itr,
+int         mutations_per_1000,
+bool        verbose,
+const char* out) noexcept {
+  std::ofstream file {out};
+
+  if (!file.is_open()) {
+    return tsp::ErrorMeasure::FILE_ERROR;
+  }
+
+  file
+  << "Ilosc miast;Nazwa;Koszt optymalny;Koszt obliczony;Ilosc iteracji;Rozmiar populacji;Maks ilosc dzieci na iteracje;Maks dzieci na pare;Maks wierzcholkow krzyzowania;Szansa na mutacje [%];Czas [us];Blad [%]\n";
+
+  for (Itr it {begin}; it != end; ++it) {
+    if (verbose) {
+      fmt::print("Genetic (N)       [{:<20}] {:>5}: ",
+                 it->name.stem().string(),
+                 it->matrix.size());
+    }
+
+    std::array<tsp::Result, 3>  cache_runs {};
+    std::array<tsp::Result, 10> runs {};
+
+    for (int j {0}; j < 3; ++j) {
+      auto result {measured_run(gen::run,
+                                it->matrix,
+                                it->graph_info,
+                                it->optimal_cost,
+                                itr,
+                                population_size,
+                                children_per_itr,
+                                *it->calc_max_children_per_pair,
+                                *it->calc_max_v_count_crossover,
+                                mutations_per_1000)};
+      if (error::handle(result) == tsp::State::ERROR) {
+        return tsp::ErrorMeasure::ALGORITHM_ERROR;
+      }
+      cache_runs.at(j) = std::move(std::get<tsp::Result>(result));
+    }
+
+    if (verbose) {
+      fmt::print("[");
+    }
+
+    for (int j {0}; j < 10; ++j) {
+      auto result_ {measured_run(gen::run,
+                                 it->matrix,
+                                 it->graph_info,
+                                 it->optimal_cost,
+                                 itr,
+                                 population_size,
+                                 children_per_itr,
+                                 *it->calc_max_children_per_pair,
+                                 *it->calc_max_v_count_crossover,
+                                 mutations_per_1000)};
+      if (error::handle(result_) == tsp::State::ERROR) [[unlikely]] {
+        return tsp::ErrorMeasure::ALGORITHM_ERROR;
+      }
+
+      runs.at(j) = std::move(std::get<tsp::Result>(result_));
+
+      if (verbose) {
+        fmt::print("-");
+      }
+    }
+
+    if (verbose) {
+      fmt::println("]");
+    }
+
+    const int         v_count {static_cast<int>(it->matrix.size())};
+    const std::string instance_name {it->name.stem().string()};
+    const int         optimal_cost {it->optimal_cost.value()};
+    const int         itr_count {itr};
+    const int         pop_size {population_size};
+    const int         children_per_pair {*it->calc_max_children_per_pair};
+    const int         v_count_crossover {*it->calc_max_v_count_crossover};
+    const int         mutations {mutations_per_1000};
+
+    for (const tsp::Result& run : runs) {
+      const int         cost {run.solution.cost};
+      const std::string time_us {
+        fmt::format("{:.2f}", run.time.count() / 1000.)};
+      const double error_percent {run.error_info->relative_percent};
+
+      file << fmt::format("{};{};{};{};{};{};{};{};{};{};{};{:.2f}\n",
+                          v_count,
+                          instance_name,
+                          optimal_cost,
+                          cost,
+                          itr_count,
+                          pop_size,
+                          children_per_itr,
+                          children_per_pair,
+                          v_count_crossover,
+                          mutations,
+                          time_us,
+                          error_percent);
+    }
+  }
+
+  return std::nullopt;
+}
+
+template<size_t count, typename Itr>
+requires std::forward_iterator<Itr> &&
+         std::is_same_v<
+         std::remove_cvref_t<typename std::iterator_traits<Itr>::value_type>,
+         tsp::Instance>
+static std::optional<tsp::ErrorMeasure> z4_measure_all(
+Itr         begin,
+Itr         end,
+int         default_itr,
+int         default_population_size,
+int         default_children_per_itr,
+int         default_max_children_per_pair,
+int         default_max_v_count_crossover,
+int         default_mutations_per_1000,
+int         min_children_per_itr,
+int         max_children_per_itr,
+int         step_children_per_itr,
+int         min_population_size,
+int         max_population_size,
+int         step_population_size,
+int         min_max_children_per_pair,
+int         max_max_children_per_pair,
+int         step_max_children_per_pair,
+int         min_max_v_count_crossover,
+int         max_max_v_count_crossover,
+int         step_max_v_count_crossover,
+int         min_mutations_per_1000,
+int         max_mutations_per_1000,
+int         step_mutations_per_1000,
+int         min_itr,
+int         max_itr,
+int         step_itr,
+bool        verbose,
+const char* out_children_per_itr,
+const char* out_population_size,
+const char* out_max_children_per_pair,
+const char* out_max_v_count_crossover,
+const char* out_mutations_per_1000,
+const char* out_itr,
+const char* out_n) noexcept {
+  std::array<Z4MeasureInstance, count> instances {};
+
+  std::optional<tsp::ErrorMeasure> err {std::nullopt};
+
+  int i {0};
+  for (Itr itr {begin}; itr != end; ++itr) {
+    instances.at(i).name                       = std::move(itr->input_file);
+    instances.at(i).matrix                     = std::move(itr->matrix);
+    instances.at(i).graph_info                 = std::move(itr->graph_info);
+    instances.at(i).optimal_cost               = itr->optimal.cost;
+    instances.at(i).calc_children_per_itr      = std::nullopt;
+    instances.at(i).calc_population_size       = std::nullopt;
+    instances.at(i).calc_max_children_per_pair = std::nullopt;
+    instances.at(i).calc_max_v_count_crossover = std::nullopt;
+    instances.at(i).calc_mutations_per_1000    = std::nullopt;
+
+    ++i;
+  }
+
+  err = z4_measure_children_per_itr_impact(instances.begin(),
+                                           instances.end(),
+                                           default_itr,
+                                           min_children_per_itr,
+                                           max_children_per_itr,
+                                           step_children_per_itr,
+                                           default_population_size,
+                                           default_max_children_per_pair,
+                                           default_max_v_count_crossover,
+                                           default_mutations_per_1000,
+                                           verbose,
+                                           out_children_per_itr);
+  if (err.has_value()) {
+    return err;
+  }
+
+  err = z4_measure_population_size_impact(instances.begin(),
+                                          instances.end(),
+                                          default_itr,
+                                          min_population_size,
+                                          max_population_size,
+                                          step_population_size,
+                                          default_max_children_per_pair,
+                                          default_max_v_count_crossover,
+                                          default_mutations_per_1000,
+                                          verbose,
+                                          out_population_size);
+  if (err.has_value()) {
+    return err;
+  }
+
+  err = z4_measure_max_children_per_pair_impact(instances.begin(),
+                                                instances.end(),
+                                                default_itr,
+                                                min_max_children_per_pair,
+                                                max_max_children_per_pair,
+                                                step_max_children_per_pair,
+                                                default_max_v_count_crossover,
+                                                default_mutations_per_1000,
+                                                verbose,
+                                                out_max_children_per_pair);
+  if (err.has_value()) {
+    return err;
+  }
+
+  err = z4_measure_max_v_count_crossover_impact(instances.begin(),
+                                                instances.end(),
+                                                default_itr,
+                                                min_max_v_count_crossover,
+                                                max_max_v_count_crossover,
+                                                step_max_v_count_crossover,
+                                                default_mutations_per_1000,
+                                                verbose,
+                                                out_max_v_count_crossover);
+  if (err.has_value()) {
+    return err;
+  }
+
+  err = z4_measure_mutations_per_1000_impact(instances.begin(),
+                                             instances.end(),
+                                             default_itr,
+                                             min_mutations_per_1000,
+                                             max_mutations_per_1000,
+                                             step_mutations_per_1000,
+                                             verbose,
+                                             out_mutations_per_1000);
+  if (err.has_value()) {
+    return err;
+  }
+
+  err = z4_measure_itr_impact(instances.begin(),
+                              instances.end(),
+                              min_itr,
+                              max_itr,
+                              step_itr,
+                              verbose,
+                              out_itr);
+  if (err.has_value()) {
+    return err;
+  }
+
+  err = z4_measure_n_impact(instances.begin(),
+                            instances.end(),
+                            default_itr,
+                            default_population_size,
+                            default_children_per_itr,
+                            default_mutations_per_1000,
                             verbose,
                             out_n);
 
@@ -1358,8 +2407,6 @@ static std::optional<tsp::ErrorMeasure> tabu_search(bool verbose) noexcept {
   }
 
   {
-    std::array<tsp::Instance, 7> tsplib_symmetric {};
-
     const std::array configs {
       "./data/tsplib_tsp/configs/127_bier127.ini",
       "./data/tsplib_tsp/configs/159_u159.ini",
@@ -1369,6 +2416,8 @@ static std::optional<tsp::ErrorMeasure> tabu_search(bool verbose) noexcept {
       "./data/tsplib_tsp/configs/299_pr299.ini",
       "./data/tsplib_tsp/configs/318_linhp318.ini",
     };
+
+    std::array<tsp::Instance, configs.size()> tsplib_symmetric {};
 
     int i {0};
     for (const auto& config : configs) {
@@ -1400,8 +2449,6 @@ static std::optional<tsp::ErrorMeasure> tabu_search(bool verbose) noexcept {
   }
 
   {
-    std::array<tsp::Instance, 6> tsplib_asymmetric {};
-
     const std::array configs {
       "./data/tsplib_atsp/configs/34_ftv33.ini",
       "./data/tsplib_atsp/configs/43_p43.ini",
@@ -1411,7 +2458,9 @@ static std::optional<tsp::ErrorMeasure> tabu_search(bool verbose) noexcept {
       "./data/tsplib_atsp/configs/100_kro124p.ini",
     };
 
-    int i{0};
+    std::array<tsp::Instance, configs.size()> tsplib_asymmetric {};
+
+    int i {0};
     for (const auto& config : configs) {
       auto instance_ {config::read(config)};
       if (error::handle(instance_) == tsp::State::ERROR) {
@@ -1451,6 +2500,235 @@ static std::optional<tsp::ErrorMeasure> tabu_search(bool verbose) noexcept {
 static std::optional<tsp::ErrorMeasure> genetic(bool verbose) noexcept {
   if (verbose) {
     fmt::print("---\nMeasuring Genetic\n");
+  }
+
+  std::optional<tsp::ErrorMeasure> err {std::nullopt};
+
+  {
+    std::array<tsp::Instance, 11 - 5 + 1> symmetric_rand {};
+    for (int i {5}; i <= 11; ++i) {
+      auto instance_ {
+        config::read(fmt::format("./data/rand_tsp/configs/{}_rand_s.ini", i))};
+      if (error::handle(instance_) == tsp::State::ERROR) {
+        return tsp::ErrorMeasure::FILE_ERROR;
+      }
+      symmetric_rand.at(i - 5) = std::move(std::get<tsp::Instance>(instance_));
+    }
+
+    err = z4_measure_all<symmetric_rand.size()>(
+    symmetric_rand.begin(),
+    symmetric_rand.end(),
+    5000,
+    25,
+    50,
+    3,
+    3,
+    100,
+    20,
+    100,
+    10,
+    20,
+    100,
+    10,
+    2,
+    10,
+    1,
+    2,
+    10,
+    1,
+    50,
+    550,
+    100,
+    1000,
+    1'0000,
+    1000,
+    verbose,
+    "./measure_g_children_per_itr_rs.csv",
+    "./measure_g_population_size_rs.csv",
+    "./measure_g_max_children_per_pair_rs.csv",
+    "./measure_g_max_v_count_crossover_rs.csv",
+    "./measure_g_mutations_per_1000_rs.csv",
+    "./measure_g_itr_rs.csv",
+    "./measure_g_n_rs.csv");
+    if (err.has_value()) {
+      return err;
+    }
+  }
+
+  {
+    std::array<tsp::Instance, 12 - 5 + 1> asymmetric_rand {};
+    for (int i {5}; i <= 12; ++i) {
+      auto instance_ {config::read(
+      fmt::format("./data/rand_atsp/configs/{}_rand_as.ini", i))};
+      if (error::handle(instance_) == tsp::State::ERROR) {
+        return tsp::ErrorMeasure::FILE_ERROR;
+      }
+      asymmetric_rand.at(i - 5) = std::move(std::get<tsp::Instance>(instance_));
+    }
+
+    err = z4_measure_all<asymmetric_rand.size()>(
+    asymmetric_rand.begin(),
+    asymmetric_rand.end(),
+    5000,
+    25,
+    50,
+    3,
+    3,
+    100,
+    20,
+    100,
+    10,
+    20,
+    100,
+    10,
+    2,
+    10,
+    1,
+    2,
+    10,
+    1,
+    50,
+    550,
+    100,
+    1000,
+    1'0000,
+    1000,
+    verbose,
+    "./measure_g_children_per_itr_ra.csv",
+    "./measure_g_population_size_ra.csv",
+    "./measure_g_max_children_per_pair_ra.csv",
+    "./measure_g_max_v_count_crossover_ra.csv",
+    "./measure_g_mutations_per_1000_ra.csv",
+    "./measure_g_itr_ra.csv",
+    "./measure_g_n_ra.csv");
+    if (err.has_value()) {
+      return err;
+    }
+  }
+
+  {
+    const std::array configs {
+      "./data/tsplib_tsp/configs/127_bier127.ini",
+      "./data/tsplib_tsp/configs/159_u159.ini",
+      "./data/tsplib_tsp/configs/180_brg180.ini",
+      "./data/tsplib_tsp/configs/225_tsp225.ini",
+      "./data/tsplib_tsp/configs/264_pr264.ini",
+      "./data/tsplib_tsp/configs/299_pr299.ini",
+      "./data/tsplib_tsp/configs/318_linhp318.ini",
+    };
+
+    std::array<tsp::Instance, configs.size()> tsplib_symmetric {};
+
+    int i {0};
+    for (const auto& config : configs) {
+      auto instance_ {config::read(config)};
+      if (error::handle(instance_) == tsp::State::ERROR) {
+        return tsp::ErrorMeasure::FILE_ERROR;
+      }
+      tsplib_symmetric.at(i) = std::move(std::get<tsp::Instance>(instance_));
+      ++i;
+    }
+
+    err = z4_measure_all<tsplib_symmetric.size()>(
+    tsplib_symmetric.begin(),
+    tsplib_symmetric.end(),
+    5000,
+    30,
+    60,
+    3,
+    20,
+    100,
+    100,
+    600,
+    100,
+    20,
+    100,
+    10,
+    2,
+    10,
+    1,
+    10,
+    60,
+    10,
+    100,
+    600,
+    100,
+    1000,
+    8000,
+    1000,
+    verbose,
+    "./measure_g_children_per_itr_libs.csv",
+    "./measure_g_population_size_libs.csv",
+    "./measure_g_max_children_per_pair_libs.csv",
+    "./measure_g_max_v_count_crossover_libs.csv",
+    "./measure_g_mutations_per_1000_libs.csv",
+    "./measure_g_itr_libs.csv",
+    "./measure_g_n_libs.csv");
+    if (err.has_value()) {
+      return err;
+    }
+  }
+
+  {
+    const std::array configs {
+      "./data/tsplib_atsp/configs/34_ftv33.ini",
+      "./data/tsplib_atsp/configs/43_p43.ini",
+      "./data/tsplib_atsp/configs/53_ft53.ini",
+      "./data/tsplib_atsp/configs/65_ftv64.ini",
+      "./data/tsplib_atsp/configs/71_ftv70.ini",
+      "./data/tsplib_atsp/configs/100_kro124p.ini",
+    };
+
+    std::array<tsp::Instance, configs.size()> tsplib_asymmetric {};
+
+    int i {0};
+    for (const auto& config : configs) {
+      auto instance_ {config::read(config)};
+      if (error::handle(instance_) == tsp::State::ERROR) {
+        return tsp::ErrorMeasure::FILE_ERROR;
+      }
+      tsplib_asymmetric.at(i) = std::move(std::get<tsp::Instance>(instance_));
+      ++i;
+    }
+
+    err = z4_measure_all<tsplib_asymmetric.size()>(
+    tsplib_asymmetric.begin(),
+    tsplib_asymmetric.end(),
+    5000,
+    30,
+    60,
+    3,
+    20,
+    100,
+    100,
+    600,
+    100,
+    20,
+    100,
+    10,
+    2,
+    10,
+    1,
+    5,
+    30,
+    5,
+    100,
+    600,
+    100,
+    1000,
+    8000,
+    1000,
+    verbose,
+    "./measure_g_children_per_itr_libs.csv",
+    "./measure_g_population_size_libs.csv",
+    "./measure_g_max_children_per_pair_libs.csv",
+    "./measure_g_max_v_count_crossover_libs.csv",
+    "./measure_g_mutations_per_1000_libs.csv",
+    "./measure_g_itr_libs.csv",
+    "./measure_g_n_libs.csv");
+    if (err.has_value()) {
+      return err;
+    }
   }
 
   if (verbose) {
