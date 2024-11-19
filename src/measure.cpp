@@ -1905,11 +1905,10 @@ static std::optional<tsp::ErrorMeasure> tabu_search(bool verbose) noexcept {
     const std::array configs {
       "./data/tsplib_tsp/configs/127_bier127.ini",
       "./data/tsplib_tsp/configs/159_u159.ini",
-      "./data/tsplib_tsp/configs/180_brg180.ini",
       "./data/tsplib_tsp/configs/225_tsp225.ini",
       "./data/tsplib_tsp/configs/264_pr264.ini",
-      "./data/tsplib_tsp/configs/299_pr299.ini",
-      "./data/tsplib_tsp/configs/318_linhp318.ini",
+      "./data/tsplib_tsp/configs/318_lin318.ini",
+      "./data/tsplib_tsp/configs/431_gr431.ini",
     };
 
     std::array<tsp::Instance, configs.size()> tsplib_symmetric {};
@@ -1946,7 +1945,7 @@ static std::optional<tsp::ErrorMeasure> tabu_search(bool verbose) noexcept {
   {
     const std::array configs {
       "./data/tsplib_atsp/configs/34_ftv33.ini",
-      "./data/tsplib_atsp/configs/43_p43.ini",
+      "./data/tsplib_atsp/configs/48_ry48p.ini",
       "./data/tsplib_atsp/configs/53_ft53.ini",
       "./data/tsplib_atsp/configs/65_ftv64.ini",
       "./data/tsplib_atsp/configs/71_ftv70.ini",
@@ -2107,11 +2106,10 @@ static std::optional<tsp::ErrorMeasure> genetic(bool verbose) noexcept {
     const std::array configs {
       "./data/tsplib_tsp/configs/127_bier127.ini",
       "./data/tsplib_tsp/configs/159_u159.ini",
-      "./data/tsplib_tsp/configs/180_brg180.ini",
       "./data/tsplib_tsp/configs/225_tsp225.ini",
       "./data/tsplib_tsp/configs/264_pr264.ini",
-      "./data/tsplib_tsp/configs/299_pr299.ini",
-      "./data/tsplib_tsp/configs/318_linhp318.ini",
+      "./data/tsplib_tsp/configs/318_lin318.ini",
+      "./data/tsplib_tsp/configs/431_gr431.ini",
     };
 
     std::array<tsp::Instance, configs.size()> tsplib_symmetric {};
@@ -2169,7 +2167,7 @@ static std::optional<tsp::ErrorMeasure> genetic(bool verbose) noexcept {
   {
     const std::array configs {
       "./data/tsplib_atsp/configs/34_ftv33.ini",
-      "./data/tsplib_atsp/configs/43_p43.ini",
+      "./data/tsplib_atsp/configs/48_ry48p.ini",
       "./data/tsplib_atsp/configs/53_ft53.ini",
       "./data/tsplib_atsp/configs/65_ftv64.ini",
       "./data/tsplib_atsp/configs/71_ftv70.ini",

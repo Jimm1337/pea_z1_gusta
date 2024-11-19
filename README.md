@@ -194,28 +194,26 @@ Program zakłada następującą strukturę na potrzeby pomiarów:
         - Folder configs
             - 127_bier127.ini
             - 159_u159.ini
-            - 180_brg180.ini
             - 225_tsp225.ini
             - 264_pr264.ini
-            - 299_pr299.ini
-            - 318_linhp318.ini
+            - 318_lin318.ini
+            - 431_gr431.ini
         - 127_bier127.txt
         - 159_u159.txt
-        - 180_brg180.txt
         - 225_tsp225.txt
         - 264_pr264.txt
-        - 299_pr299.txt
-        - 318_linhp318.txt
+        - 318_lin318.txt
+        - 431_gr431.txt
     - folder tsplib_atsp [Tylko dla zadania 3 i 4]
         - Folder configs
             - 34_ftv33.ini
-            - 43_p43.ini
+            - 48_ry48p.ini
             - 53_ft53.ini
             - 65_ftv64.ini
             - 71_ftv70.ini
             - 100_kro124p.ini
         - 34_ftv33.txt
-        - 43_p43.txt
+        - 48_ry48p.txt
         - 53_ft53.txt
         - 65_ftv64.txt
         - 71_ftv70.txt

@@ -434,8 +434,38 @@ namespace util::arg {
 void help_page() noexcept {
   fmt::println(
   "Usage:\n"
-  "(Single Run) pea_z1_gusta --config=<config file path> <one of the algorithm flags>\n"
-  "(Measuring Run) pea_z1_gusta --measure (optional)--verbose <one or more of the algorithm flags>\n\n"
+  #if defined(ZADANIE1) && ZADANIE1 == 1
+  "(Single Run) ./pea_gusta_zadanie_1 --config=<config file path> <one of the algorithm flags>\n"
+  #endif
+
+  #if defined(ZADANIE2) && ZADANIE2 == 1
+  "(Single Run) ./pea_gusta_zadanie_2 --config=<config file path> <one of the algorithm flags>\n"
+  #endif
+
+  #if defined(ZADANIE3) && ZADANIE3 == 1
+  "(Single Run) ./pea_gusta_zadanie_3 --config=<config file path> <one of the algorithm flags>\n"
+  #endif
+
+  #if defined(ZADANIE4) && ZADANIE4 == 1
+  "(Single Run) ./pea_gusta_zadanie_4 --config=<config file path> <one of the algorithm flags>\n"
+  #endif
+
+  #if defined(ZADANIE1) && ZADANIE1 == 1
+  "(Measuring Run) ./pea_gusta_zadanie_1 --measure (optional)--verbose <one or more of the algorithm flags>\n\n"
+  #endif
+
+  #if defined(ZADANIE2) && ZADANIE2 == 1
+  "(Measuring Run) ./pea_gusta_zadanie_2 --measure (optional)--verbose <one or more of the algorithm flags>\n\n"
+  #endif
+
+  #if defined(ZADANIE3) && ZADANIE3 == 1
+  "(Measuring Run) ./pea_gusta_zadanie_3 --measure (optional)--verbose <one or more of the algorithm flags>\n\n"
+  #endif
+
+  #if defined(ZADANIE4) && ZADANIE4 == 1
+  "(Measuring Run) ./pea_gusta_zadanie_4 --measure (optional)--verbose <one or more of the algorithm flags>\n\n"
+  #endif
+
   "Flags:\n"
 
 #if defined(ZADANIE1) && ZADANIE1 == 1
@@ -461,40 +491,37 @@ void help_page() noexcept {
   "\nExample:\n"
 
 #if defined(ZADANIE1) && ZADANIE1 == 1
-  "pea_z1_gusta --config=C:/dev/pea_z1_gusta/configs/test_6.ini -r\n"
+  "./pea_gusta_zadanie_1 --config=C:/dev/pea_z1_gusta/configs/test_6.ini -r\n"
 #endif
 
 #if defined(ZADANIE2) && ZADANIE2 == 1
-  "pea_z1_gusta --config=C:/dev/pea_z1_gusta/configs/test_6.ini -lc\n"
+  "./pea_gusta_zadanie_2 --config=C:/dev/pea_z1_gusta/configs/test_6.ini -lc\n"
 #endif
 
 #if defined(ZADANIE3) && ZADANIE3 == 1
-  "pea_z1_gusta --config=C:/dev/pea_z1_gusta/configs/test_6.ini -ts\n"
+  "./pea_gusta_zadanie_3 --config=C:/dev/pea_z1_gusta/configs/test_6.ini -ts\n"
 #endif
 
 #if defined(ZADANIE4) && ZADANIE4 == 1
-  "pea_z1_gusta --config=C:/dev/pea_z1_gusta/configs/test_6.ini -g\n"
+  "./pea_gusta_zadanie_4 --config=C:/dev/pea_z1_gusta/configs/test_6.ini -g\n"
 #endif
-
-  "pea_z1_gusta --measure --verbose "
 
 #if defined(ZADANIE1) && ZADANIE1 == 1
-  "-bf -nn -r "
+  "./pea_gusta_zadanie_1 --measure --verbose -bf -nn -r\n"
 #endif
 
 #if defined(ZADANIE2) && ZADANIE2 == 1
-  "-lc -bb -bd "
+  "./pea_gusta_zadanie_2 --measure --verbose -bd -bb -lc\n"
 #endif
 
 #if defined(ZADANIE3) && ZADANIE3 == 1
-  "-ts "
+  "./pea_gusta_zadanie_3 --measure --verbose -ts\n"
 #endif
 
 #if defined(ZADANIE4) && ZADANIE4 == 1
-  "-g "
+  "./pea_gusta_zadanie_4 --measure --verbose -g\n"
 #endif
-
-  "\n");
+);
 }
 
 [[nodiscard]] std::variant<tsp::Arguments, tsp::ErrorArg> read(
