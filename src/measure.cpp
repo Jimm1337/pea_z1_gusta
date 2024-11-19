@@ -1,23 +1,23 @@
 #include "measure.hpp"
 
 #if (defined(ZADANIE1) && ZADANIE1 == 1)
-#include "zadanie_1/bf.hpp"
-#include "zadanie_1/nn.hpp"
-#include "zadanie_1/random.hpp"
+  #include "zadanie_1/bf.hpp"
+  #include "zadanie_1/nn.hpp"
+  #include "zadanie_1/random.hpp"
 #endif
 
 #if (defined(ZADANIE2) && ZADANIE2 == 1)
-#include "zadanie_2/bxb_bfs.hpp"
-#include "zadanie_2/bxb_dfs.hpp"
-#include "zadanie_2/bxb_lc.hpp"
+  #include "zadanie_2/bxb_bfs.hpp"
+  #include "zadanie_2/bxb_dfs.hpp"
+  #include "zadanie_2/bxb_lc.hpp"
 #endif
 
 #if (defined(ZADANIE3) && ZADANIE3 == 1)
-#include "zadanie_3/ts.hpp"
+  #include "zadanie_3/ts.hpp"
 #endif
 
 #if (defined(ZADANIE4) && ZADANIE4 == 1)
-#include "zadanie_4/gen.hpp"
+  #include "zadanie_4/gen.hpp"
 #endif
 
 #include <fstream>
@@ -46,7 +46,8 @@ Params... algo_params) noexcept {
     return tsp::ErrorMeasure::FILE_ERROR;
   }
 
-  file_s << "Nazwa;Koszt optymalny;Koszt obliczony;Czas [us]\n";
+  file_s
+  << "Ilosc wierzcholkow;Nazwa;Koszt optymalny;Koszt obliczony;Czas [us]\n";
 
   for (int s {5}; s < std::min(20, max_v); ++s) {
     if (verbose) {
@@ -104,12 +105,14 @@ Params... algo_params) noexcept {
 
     const std::string instance_name {instance.input_file.filename().string()};
     const int         optimal_cost {instance.optimal.cost};
+    const int         v_count {static_cast<int>(instance.matrix.size())};
     for (const tsp::Result& run : runs) {
       const int         cost {run.solution.cost};
       const std::string time_us {
-        fmt::format("{:.2f}", run.time.count() / 1000.)};
+        fmt::format("{:.2f}", run.time.count() * 1000.)};
 
-      file_s << fmt::format("{};{};{};{}\n",
+      file_s << fmt::format("{};{};{};{};{}\n",
+                            v_count,
                             instance_name,
                             optimal_cost,
                             cost,
@@ -141,7 +144,8 @@ Params... algo_params) noexcept {
     return tsp::ErrorMeasure::FILE_ERROR;
   }
 
-  file_as << "Nazwa;Koszt optymalny;Koszt obliczony;Czas [us]\n";
+  file_as
+  << "Ilosc wierzcholkow;Nazwa;Koszt optymalny;Koszt obliczony;Czas [us]\n";
 
   for (int s {5}; s < std::min(19, max_v); ++s) {
     if (verbose) {
@@ -199,12 +203,14 @@ Params... algo_params) noexcept {
 
     const std::string instance_name {instance.input_file.filename().string()};
     const int         optimal_cost {instance.optimal.cost};
+    const int         v_count {static_cast<int>(instance.matrix.size())};
     for (const tsp::Result& run : runs) {
       const int         cost {run.solution.cost};
       const std::string time_us {
-        fmt::format("{:.2f}", run.time.count() / 1000.)};
+        fmt::format("{:.2f}", run.time.count() * 1000.)};
 
-      file_as << fmt::format("{};{};{};{}\n",
+      file_as << fmt::format("{};{};{};{};{}\n",
+                             v_count,
                              instance_name,
                              optimal_cost,
                              cost,
@@ -317,7 +323,7 @@ requires std::forward_iterator<Itr> &&
 
       for (const tsp::Result& run : runs) {
         const std::string time_us {
-          fmt::format("{:.2f}", run.time.count() / 1000.)};
+          fmt::format("{:.2f}", run.time.count() * 1000.)};
 
         file << fmt::format("{};{};{};{};{};{};{};{:.2f}\n",
                             v_count,
@@ -427,7 +433,7 @@ requires std::forward_iterator<Itr> &&
 
       for (const tsp::Result& run : runs) {
         const std::string time_us {
-          fmt::format("{:.2f}", run.time.count() / 1000.)};
+          fmt::format("{:.2f}", run.time.count() * 1000.)};
 
         file << fmt::format("{};{};{};{};{};{};{};{:.2f}\n",
                             v_count,
@@ -526,7 +532,7 @@ requires std::forward_iterator<Itr> &&
 
     for (const tsp::Result& run : runs) {
       const std::string time_us {
-        fmt::format("{:.2f}", run.time.count() / 1000.)};
+        fmt::format("{:.2f}", run.time.count() * 1000.)};
 
       file << fmt::format("{};{};{};{};{};{};{};{:.2f}\n",
                           v_count,
@@ -727,7 +733,7 @@ requires std::forward_iterator<Itr> &&
       for (const tsp::Result& run : runs) {
         const int         cost {run.solution.cost};
         const std::string time_us {
-          fmt::format("{:.2f}", run.time.count() / 1000.)};
+          fmt::format("{:.2f}", run.time.count() * 1000.)};
         const double error_percent {run.error_info->relative_percent};
 
         if (last_percent - error_percent > 0.1) {
@@ -856,7 +862,7 @@ requires std::forward_iterator<Itr> &&
       for (const tsp::Result& run : runs) {
         const int         cost {run.solution.cost};
         const std::string time_us {
-          fmt::format("{:.2f}", run.time.count() / 1000.)};
+          fmt::format("{:.2f}", run.time.count() * 1000.)};
         const double error_percent {run.error_info->relative_percent};
 
         if (last_percent - error_percent > 0.1) {
@@ -984,7 +990,7 @@ requires std::forward_iterator<Itr> &&
       for (const tsp::Result& run : runs) {
         const int         cost {run.solution.cost};
         const std::string time_us {
-          fmt::format("{:.2f}", run.time.count() / 1000.)};
+          fmt::format("{:.2f}", run.time.count() * 1000.)};
         const double error_percent {run.error_info->relative_percent};
 
         if (last_percent - error_percent > 0.1) {
@@ -1111,7 +1117,7 @@ requires std::forward_iterator<Itr> &&
       for (const tsp::Result& run : runs) {
         const int         cost {run.solution.cost};
         const std::string time_us {
-          fmt::format("{:.2f}", run.time.count() / 1000.)};
+          fmt::format("{:.2f}", run.time.count() * 1000.)};
         const double error_percent {run.error_info->relative_percent};
 
         if (last_percent - error_percent > 0.1) {
@@ -1237,7 +1243,7 @@ requires std::forward_iterator<Itr> &&
       for (const tsp::Result& run : runs) {
         const int         cost {run.solution.cost};
         const std::string time_us {
-          fmt::format("{:.2f}", run.time.count() / 1000.)};
+          fmt::format("{:.2f}", run.time.count() * 1000.)};
         const double error_percent {run.error_info->relative_percent};
 
         if (last_percent - error_percent > 0.1) {
@@ -1358,7 +1364,7 @@ const char* out) noexcept {
       for (const tsp::Result& run : runs) {
         const int         cost {run.solution.cost};
         const std::string time_us {
-          fmt::format("{:.2f}", run.time.count() / 1000.)};
+          fmt::format("{:.2f}", run.time.count() * 1000.)};
         const double error_percent {run.error_info->relative_percent};
 
         file << fmt::format("{};{};{};{};{};{};{};{};{};{};{};{:.2f}\n",
@@ -1473,7 +1479,7 @@ const char* out) noexcept {
     for (const tsp::Result& run : runs) {
       const int         cost {run.solution.cost};
       const std::string time_us {
-        fmt::format("{:.2f}", run.time.count() / 1000.)};
+        fmt::format("{:.2f}", run.time.count() * 1000.)};
       const double error_percent {run.error_info->relative_percent};
 
       file << fmt::format("{};{};{};{};{};{};{};{};{};{};{};{:.2f}\n",
@@ -2237,7 +2243,7 @@ const tsp::MeasuringRun& run) noexcept {
 
   for (const auto& algo : run.algorithms) {
     switch (algo) {
-      #if defined(ZADANIE1) && ZADANIE1 == 1
+#if defined(ZADANIE1) && ZADANIE1 == 1
       case tsp::Algorithm::NEAREST_NEIGHBOUR:
         err = measure::nearest_neighbour(run.verbose);
         break;
@@ -2247,9 +2253,9 @@ const tsp::MeasuringRun& run) noexcept {
       case tsp::Algorithm::RANDOM:
         err = measure::random(run.verbose);
         break;
-      #endif
+#endif
 
-      #if defined(ZADANIE2) && ZADANIE2 == 1
+#if defined(ZADANIE2) && ZADANIE2 == 1
       case tsp::Algorithm::BXB_LEAST_COST:
         err = measure::bxb_least_cost(run.verbose);
         break;
@@ -2259,19 +2265,19 @@ const tsp::MeasuringRun& run) noexcept {
       case tsp::Algorithm::BXB_DFS:
         err = measure::bxb_dfs(run.verbose);
         break;
-      #endif
+#endif
 
-      #if defined(ZADANIE3) && ZADANIE3 == 1
+#if defined(ZADANIE3) && ZADANIE3 == 1
       case tsp::Algorithm::TABU_SEARCH:
         err = measure::tabu_search(run.verbose);
         break;
-      #endif
+#endif
 
-      #if defined(ZADANIE4) && ZADANIE4 == 1
+#if defined(ZADANIE4) && ZADANIE4 == 1
       case tsp::Algorithm::GENETIC:
         err = measure::genetic(run.verbose);
         break;
-      #endif
+#endif
 
       default:
         break;
@@ -2286,4 +2292,3 @@ const tsp::MeasuringRun& run) noexcept {
 }
 
 }    // namespace util::measure
-
