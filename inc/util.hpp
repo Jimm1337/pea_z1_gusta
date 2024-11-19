@@ -28,14 +28,26 @@ enum class State : uint_fast8_t {
 };
 
 enum class Algorithm : uint_fast8_t {
+#if defined(ZADANIE1) && ZADANIE1 == 1
   BRUTE_FORCE,
   NEAREST_NEIGHBOUR,
   RANDOM,
+#endif
+
+#if defined(ZADANIE2) && ZADANIE2 == 1
   BXB_LEAST_COST,
   BXB_BFS,
   BXB_DFS,
+#endif
+
+#if defined(ZADANIE3) && ZADANIE3 == 1
   TABU_SEARCH,
+#endif
+
+#if defined(ZADANIE4) && ZADANIE4 == 1
   GENETIC,
+#endif
+
   INVALID,
 };
 
@@ -68,7 +80,7 @@ enum class ErrorMeasure : uint_fast8_t {
 
 struct MeasuringRun {
   std::array<Algorithm, 8> algorithms;
-  bool verbose;
+  bool                     verbose;
 };
 
 struct SingleRun {
@@ -83,16 +95,21 @@ struct Solution {
   int              cost;
 };
 
+#if defined(ZADANIE1) && ZADANIE1 == 1
 struct ParamRandom {
   int millis;
 };
+#endif
 
+#if defined(ZADANIE3) && ZADANIE3 == 1
 struct ParamTabuSearch {
   int itr;
   int max_itr_no_improve;
   int tabu_itr;
 };
+#endif
 
+#if defined(ZADANIE4) && ZADANIE4 == 1
 struct ParamGenetic {
   int itr;
   int population_size;
@@ -101,11 +118,20 @@ struct ParamGenetic {
   int max_v_count_crossover;
   int mutations_per_1000;
 };
+#endif
 
 struct Param {
-  ParamRandom     random;
+#if defined(ZADANIE1) && ZADANIE1 == 1
+  ParamRandom random;
+#endif
+
+#if defined(ZADANIE3) && ZADANIE3 == 1
   ParamTabuSearch tabu_search;
-  ParamGenetic    genetic;
+#endif
+
+#if defined(ZADANIE4) && ZADANIE4 == 1
+  ParamGenetic genetic;
+#endif
 };
 
 struct GraphInfo {
@@ -175,13 +201,6 @@ const char** argv) noexcept;
 void help_page() noexcept;
 
 }    // namespace util::arg
-
-namespace util::measure {
-
-std::variant<std::monostate, tsp::ErrorMeasure> execute_measurements(
-const tsp::MeasuringRun& run) noexcept;
-
-}    // namespace util::measure
 
 namespace util::error {
 

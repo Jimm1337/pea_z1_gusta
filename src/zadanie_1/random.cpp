@@ -1,4 +1,4 @@
-#include "random.hpp"
+#include "zadanie_1/random.hpp"
 
 #include "util.hpp"
 

@@ -1,6 +1,6 @@
-#include "ts.hpp"
+#include "zadanie_3/ts.hpp"
 
-#include "nn.hpp"
+#include "zadanie_1/nn.hpp"
 #include "util.hpp"
 
 #include <vector>

@@ -1,20 +1,15 @@
-#include "bf.hpp"
+#include "zadanie_1/nn.hpp"
 
 #include "util.hpp"
 
 #include <limits>
 #include <queue>
 #include <vector>
-#include <optional>
 #include <variant>
+#include <optional>
 #include <utility>
 
-namespace bf::impl {
-
-struct Candidate {
-  int vertex;
-  int cost;
-};
+namespace nn::impl {
 
 struct WorkingSolution {
   std::vector<bool> used_vertices;
@@ -30,8 +25,7 @@ static void algorithm(const tsp::Matrix<int>& matrix,
   std::queue<WorkingSolution> queue {
     {WorkingSolution {.used_vertices =
                       [&starting_vertex, &v_count]() noexcept {
-                        std::vector<bool> used {};
-                        used.resize(v_count, false);
+                        std::vector used {std::vector(v_count, false)};
                         used.at(starting_vertex) = true;
                         return used;
                       }(),
@@ -54,24 +48,29 @@ static void algorithm(const tsp::Matrix<int>& matrix,
         current_best.path.emplace_back(starting_vertex);
       }
     } else [[likely]] {
-      // explore all valid options (not used in current path)
-      std::vector<Candidate> options {};
+      // explore all adjacent vertices which cost minimal cost to travel to
+      std::vector<int> nearest {};
+      int              min_cost {std::numeric_limits<int>::max()};
       for (int vertex {0}; vertex < v_count; ++vertex) {
         const bool used {current.used_vertices.at(vertex)};
 
         if (const int cost {matrix.at(current_v).at(vertex)};
-            !used && cost != -1) [[likely]] {
-          options.emplace_back(Candidate {.vertex = vertex, .cost = cost});
+            !used && cost != -1 && cost <= min_cost) [[unlikely]] {
+          if (cost < min_cost) [[unlikely]] {
+            nearest.clear();
+            min_cost = cost;
+          }
+          nearest.emplace_back(vertex);
         }
       }
 
-      // add next paths to be processed for every valid option
-      for (const auto& option : options) {
-        queue.push([&current, &option]() noexcept {
+      // add next paths to be processed for nearest neighbour
+      for (const auto& option : nearest) {
+        queue.push([&current, &option, &min_cost]() noexcept {
           WorkingSolution next_itr {current};
-          next_itr.solution.path.emplace_back(option.vertex);
-          next_itr.solution.cost                   += option.cost;
-          next_itr.used_vertices.at(option.vertex)  = true;
+          next_itr.solution.path.emplace_back(option);
+          next_itr.solution.cost            += min_cost;
+          next_itr.used_vertices.at(option)  = true;
           return next_itr;
         }());
       }
@@ -79,9 +78,9 @@ static void algorithm(const tsp::Matrix<int>& matrix,
   }
 }
 
-}    // namespace bf::impl
+}    // namespace nn::impl
 
-namespace bf {
+namespace nn {
 
 [[nodiscard]] std::variant<tsp::Solution, tsp::ErrorAlgorithm> run(
 const tsp::Matrix<int>&   matrix,
@@ -113,4 +112,4 @@ const std::optional<int>& optimal_cost) noexcept {
   return best;
 }
 
-}    // namespace bf
+}    // namespace nn

@@ -1,15 +1,30 @@
-#include "bf.hpp"
-#include "bxb.hpp"
-#include "gen.hpp"
-#include "nn.hpp"
-#include "random.hpp"
-#include "ts.hpp"
 #include "util.hpp"
+#include "measure.hpp"
+
+#if defined(ZADANIE1) && ZADANIE1 == 1
+  #include "zadanie_1/bf.hpp"
+  #include "zadanie_1/nn.hpp"
+  #include "zadanie_1/random.hpp"
+#endif
+
+#if defined(ZADANIE2) && ZADANIE2 == 1
+  #include "zadanie_2/bxb_bfs.hpp"
+  #include "zadanie_2/bxb_dfs.hpp"
+  #include "zadanie_2/bxb_lc.hpp"
+#endif
+
+#if defined(ZADANIE3) && ZADANIE3 == 1
+  #include "zadanie_3/ts.hpp"
+#endif
+
+#if defined(ZADANIE4) && ZADANIE4 == 1
+  #include "zadanie_4/gen.hpp"
+#endif
 
 #include <cstdlib>
 #include <optional>
-#include <windows.h>
 #include <variant>
+#include <windows.h>
 
 #pragma comment(lib, "Kernel32.lib")
 
@@ -50,6 +65,7 @@ int main(int argc, const char** argv) {
 
   const auto timed_result {[&arg, &config, &optimal_cost]() noexcept {
     switch (std::get<tsp::SingleRun>(arg).algorithm) {
+#if defined(ZADANIE1) && ZADANIE1 == 1
       case tsp::Algorithm::BRUTE_FORCE:
         return util::measured_run(bf::run,
                                   config.matrix,
@@ -66,6 +82,9 @@ int main(int argc, const char** argv) {
                                   config.graph_info,
                                   optimal_cost,
                                   config.params.random.millis);
+#endif
+
+#if defined(ZADANIE2) && ZADANIE2 == 1
       case tsp::Algorithm::BXB_LEAST_COST:
         return util::measured_run(bxb::lc::run,
                                   config.matrix,
@@ -81,6 +100,9 @@ int main(int argc, const char** argv) {
                                   config.matrix,
                                   config.graph_info,
                                   optimal_cost);
+#endif
+
+#if defined(ZADANIE3) && ZADANIE3 == 1
       case tsp::Algorithm::TABU_SEARCH:
         return util::measured_run(ts::run,
                                   config.matrix,
@@ -89,6 +111,9 @@ int main(int argc, const char** argv) {
                                   config.params.tabu_search.itr,
                                   config.params.tabu_search.max_itr_no_improve,
                                   config.params.tabu_search.tabu_itr);
+#endif
+
+#if defined(ZADANIE4) && ZADANIE4 == 1
       case tsp::Algorithm::GENETIC:
         return util::measured_run(gen::run,
                                   config.matrix,
@@ -100,6 +125,7 @@ int main(int argc, const char** argv) {
                                   config.params.genetic.max_children_per_pair,
                                   config.params.genetic.max_v_count_crossover,
                                   config.params.genetic.mutations_per_1000);
+#endif
       default:
         std::exit(1);
     }

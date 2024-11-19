@@ -1,5 +1,5 @@
-#include "bxb.hpp"
-#include "nn.hpp"
+#include "zadanie_2/bxb_dfs.hpp"
+#include "zadanie_1/nn.hpp"
 #include "util.hpp"
 
 #include <cstddef>

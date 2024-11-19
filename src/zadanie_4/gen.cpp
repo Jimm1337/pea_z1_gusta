@@ -1,6 +1,6 @@
-#include "gen.hpp"
+#include "zadanie_4/gen.hpp"
 
-#include "nn.hpp"
+#include "zadanie_1/nn.hpp"
 #include "util.hpp"
 
 #include <compare>
