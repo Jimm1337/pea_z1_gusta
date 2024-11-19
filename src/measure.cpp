@@ -2001,33 +2001,33 @@ static std::optional<tsp::ErrorMeasure> genetic(bool verbose) noexcept {
   std::optional<tsp::ErrorMeasure> err {std::nullopt};
 
   {
-    std::array<tsp::Instance, 11 - 5 + 1> symmetric_rand {};
-    for (int i {5}; i <= 11; ++i) {
+    std::array<tsp::Instance, 11 - 7 + 1> symmetric_rand {};
+    for (int i {7}; i <= 11; ++i) {
       auto instance_ {
         config::read(fmt::format("./data/rand_tsp/configs/{}_rand_s.ini", i))};
       if (error::handle(instance_) == tsp::State::ERROR) {
         return tsp::ErrorMeasure::FILE_ERROR;
       }
-      symmetric_rand.at(i - 5) = std::move(std::get<tsp::Instance>(instance_));
+      symmetric_rand.at(i - 7) = std::move(std::get<tsp::Instance>(instance_));
     }
 
     err = z4_measure_all<symmetric_rand.size()>(
     symmetric_rand.begin(),
     symmetric_rand.end(),
     5000,
+    10,
+    20,
+    3,
+    3,
+    100,
+    5,
     25,
-    50,
-    3,
-    3,
-    100,
-    20,
-    100,
+    5,
+    5,
     10,
-    20,
-    100,
-    10,
+    1,
     2,
-    10,
+    8,
     1,
     2,
     10,
@@ -2052,33 +2052,33 @@ static std::optional<tsp::ErrorMeasure> genetic(bool verbose) noexcept {
   }
 
   {
-    std::array<tsp::Instance, 12 - 5 + 1> asymmetric_rand {};
-    for (int i {5}; i <= 12; ++i) {
+    std::array<tsp::Instance, 12 - 7 + 1> asymmetric_rand {};
+    for (int i {7}; i <= 12; ++i) {
       auto instance_ {config::read(
       fmt::format("./data/rand_atsp/configs/{}_rand_as.ini", i))};
       if (error::handle(instance_) == tsp::State::ERROR) {
         return tsp::ErrorMeasure::FILE_ERROR;
       }
-      asymmetric_rand.at(i - 5) = std::move(std::get<tsp::Instance>(instance_));
+      asymmetric_rand.at(i - 7) = std::move(std::get<tsp::Instance>(instance_));
     }
 
     err = z4_measure_all<asymmetric_rand.size()>(
     asymmetric_rand.begin(),
     asymmetric_rand.end(),
     5000,
+    10,
+    20,
+    3,
+    3,
+    100,
+    5,
     25,
-    50,
-    3,
-    3,
-    100,
-    20,
-    100,
+    5,
+    5,
     10,
-    20,
-    100,
-    10,
+    1,
     2,
-    10,
+    8,
     1,
     2,
     10,

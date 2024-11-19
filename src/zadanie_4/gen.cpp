@@ -352,10 +352,11 @@ int                       mutations_per_1000) noexcept {
     // mutate based on mutation chance, the base is chosen on geometric distribution basis, if mutation is successful add to population
     for (int mutation_chance {0}; mutation_chance < 1000; ++mutation_chance) {
       if (mutation_dist(rand_src) < mutations_per_1000) [[unlikely]] {
+        const int to_mutate {std::min(static_cast<int>(population.size() - 1), mutated_dist(rand_src))};
         if (auto mutated {mutate(matrix,
                                  rand_src,
                                  *std::ranges::next(population.begin(),
-                                                    mutated_dist(rand_src),
+                                                    to_mutate,
                                                     population.end()))};
             mutated.has_value()) {
           population.emplace(std::move(mutated.value()));
