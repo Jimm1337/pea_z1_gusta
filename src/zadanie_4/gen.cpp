@@ -1,7 +1,7 @@
 #include "zadanie_4/gen.hpp"
 
-#include "zadanie_1/nn.hpp"
 #include "util.hpp"
+#include "zadanie_1/nn.hpp"
 
 #include <compare>
 #include <optional>
@@ -83,11 +83,11 @@ init_population(const tsp::Matrix<int>&   matrix,
     const auto second_v {nn_chromosome.path.at(second_idx)};
 
     const int first_new_cost_left {
-      matrix.at(first_v).at(nn_chromosome.path.at(second_idx - 1))};
+      matrix.at(nn_chromosome.path.at(second_idx - 1)).at(first_v)};
     const int first_new_cost_right {
       matrix.at(first_v).at(nn_chromosome.path.at(second_idx + 1))};
     const int second_new_cost_left {
-      matrix.at(second_v).at(nn_chromosome.path.at(first_idx - 1))};
+      matrix.at(nn_chromosome.path.at(first_idx - 1)).at(second_v)};
     const int second_new_cost_right {
       matrix.at(second_v).at(nn_chromosome.path.at(first_idx + 1))};
 
@@ -98,9 +98,9 @@ init_population(const tsp::Matrix<int>&   matrix,
     }
 
     const int old_cost {
-      matrix.at(first_v).at(nn_chromosome.path.at(first_idx - 1)) +
+      matrix.at(nn_chromosome.path.at(first_idx - 1)).at(first_v) +
       matrix.at(first_v).at(nn_chromosome.path.at(first_idx + 1)) +
-      matrix.at(second_v).at(nn_chromosome.path.at(second_idx - 1)) +
+      matrix.at(nn_chromosome.path.at(second_idx - 1)).at(second_v) +
       matrix.at(second_v).at(nn_chromosome.path.at(second_idx + 1))};
 
     const int cost_diff {first_new_cost_left + first_new_cost_right +
@@ -207,7 +207,7 @@ static std::optional<Chromosome> mutate(const tsp::Matrix<int>& matrix,
 
   const int v_count {static_cast<int>(matrix.size())};
 
-  std::uniform_int_distribution dist {1, v_count - 2};
+  std::uniform_int_distribution dist {2, v_count - 2};
 
   const int swap_idx {dist(rand_src)};
   const int swap_v {base.path.at(swap_idx)};
@@ -352,7 +352,8 @@ int                       mutations_per_1000) noexcept {
     // mutate based on mutation chance, the base is chosen on geometric distribution basis, if mutation is successful add to population
     for (int mutation_chance {0}; mutation_chance < 1000; ++mutation_chance) {
       if (mutation_dist(rand_src) < mutations_per_1000) [[unlikely]] {
-        const int to_mutate {std::min(static_cast<int>(population.size() - 1), mutated_dist(rand_src))};
+        const int to_mutate {std::min(static_cast<int>(population.size() - 1),
+                                      mutated_dist(rand_src))};
         if (auto mutated {mutate(matrix,
                                  rand_src,
                                  *std::ranges::next(population.begin(),
@@ -391,15 +392,15 @@ int                       mutations_per_1000) noexcept {
     return tsp::ErrorAlgorithm::INVALID_PARAM;
   }
 
-  if (matrix.empty()) [[unlikely]] { // edge case: no vertices
+  if (matrix.empty()) [[unlikely]] {    // edge case: no vertices
     return tsp::ErrorAlgorithm::NO_PATH;
   }
 
-  if (matrix.size() == 1) [[unlikely]] { // edge case: 1 vertex
+  if (matrix.size() == 1) [[unlikely]] {    // edge case: 1 vertex
     return tsp::Solution {.path = {0}, .cost = 0};
   }
 
-  if (matrix.size() == 2) [[unlikely]] { // edge case: 2 vertices
+  if (matrix.size() == 2) [[unlikely]] {    // edge case: 2 vertices
     return nn::run(matrix, graph_info, optimal_cost);
   }
 
