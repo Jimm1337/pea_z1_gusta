@@ -182,6 +182,8 @@ constexpr static void perform_swap(WorkingSolution&     solution,
   solution.solution.cost += swap.delta_cost;
 }
 
+// memory -> O(n^2 + 3 * n) >> tabu_matrix + 2 solutins -> O(n^2 + n)
+// time -> O(n^2 + 2 * n^2 * itr_count) >> nn + tabu -> O(n^2 + n^2 * itr_count)
 template<typename WorkingSolutionType, typename TabuMatrixType>
 requires std::is_same_v<std::remove_cvref_t<WorkingSolutionType>,
                         WorkingSolution> &&
@@ -194,7 +196,7 @@ static tsp::Solution algorithm(const tsp::Matrix<int>&   matrix,
                                int no_improve_stop_itr_count,
                                int tabu_itr_count) noexcept {
   tsp::Matrix<int> tabu_matrix {std::forward<TabuMatrixType>(tabu_matrix_in)};
-  WorkingSolution  work {std::forward<WorkingSolutionType>(starting_solution)};
+  WorkingSolution  work {std::forward<WorkingSolutionType>(starting_solution)}; //time O(n^2) - nn
   tsp::Solution    best {work.solution};
   int              no_improve_itr_count {0};
 
@@ -205,7 +207,7 @@ static tsp::Solution algorithm(const tsp::Matrix<int>&   matrix,
 
   for (int itr {0}; itr < itr_count; ++itr) {
     const SwapCandidate best_candidate {
-      get_best_candidate(matrix, tabu_matrix, work, best.cost)};
+      get_best_candidate(matrix, tabu_matrix, work, best.cost)}; //time O(n^2) - check all swaps
 
     const bool can_swap {
       !best_candidate.tabu || best_candidate.aspiration_criterion ||
@@ -241,7 +243,7 @@ static tsp::Solution algorithm(const tsp::Matrix<int>&   matrix,
       }
     }
 
-    update_tabu(tabu_matrix);
+    update_tabu(tabu_matrix); //time O(n^2) - update tabu
   }
 
   return best;

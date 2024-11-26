@@ -44,6 +44,8 @@ struct Chromosome {
 // population is always sorted by cost
 using Population = std::set<Chromosome>;
 
+// O(n^2 + population_count * logn) >> nn + init_population -> O(n^2 + population_count * logn)
+// memory -> O(n^2 + n) >> nn + population -> O(n^2 + n)
 [[nodiscard]] static std::variant<Population, tsp::ErrorAlgorithm>
 init_population(const tsp::Matrix<int>&   matrix,
                 const tsp::GraphInfo&     graph_info,
@@ -52,7 +54,7 @@ init_population(const tsp::Matrix<int>&   matrix,
                 int                       population_count) noexcept {
   const int v_count {static_cast<int>(matrix.size())};
 
-  auto nn_result {nn::run(matrix, graph_info, optimal_cost)};
+  auto nn_result {nn::run(matrix, graph_info, optimal_cost)}; //O(n^2) -  nn
   if (std::holds_alternative<tsp::ErrorAlgorithm>(nn_result)) [[unlikely]] {
     return std::get<tsp::ErrorAlgorithm>(nn_result);
   }
@@ -112,7 +114,7 @@ init_population(const tsp::Matrix<int>&   matrix,
                         &first_idx,
                         &second_v,
                         &second_idx,
-                        &cost_diff]() noexcept {
+                        &cost_diff]() noexcept { //O(log(n)) - insert
       Chromosome chromosome {.vertices = nn_chromosome.vertices,
                              .path     = nn_chromosome.path,
                              .cost     = nn_chromosome.cost + cost_diff};
@@ -255,6 +257,10 @@ static void cut(Population& population, int target_count) noexcept {
   population.end());
 }
 
+// O(children_per_itr * log(population_size + children_per_itr) + children_per_itr * (children_per_itr + population_size)) >>
+// O(children_per_itr * (log(population_size + children_per_itr) + children_per_itr + population_size)) >>
+// O(children_per_itr^2 + children_per_itr * (log(population_size + children_per_itr) + population_size))
+// mem O(children_per_itr)
 static void reproduce(const tsp::Matrix<int>& matrix,
                       auto&                   rand_src,
                       Population&             population,
@@ -265,21 +271,21 @@ static void reproduce(const tsp::Matrix<int>& matrix,
 
   std::uniform_int_distribution dist {};
 
-  std::vector<Chromosome> children {};
+  std::vector<Chromosome> children {}; // mem O(children_per_itr)
   children.reserve(children_per_itr);
 
   // only the first half of the population is used as parent base, the second
   // half is used as second parent
   while (children.size() != children_per_itr) [[likely]] {
     const auto first_parent_itr {
-      std::next(population.begin(),
+      std::next(population.begin(), // O(population_size + children_per_itr)
                 dist(rand_src,
                      std::uniform_int_distribution<>::param_type {
                        0,
                        static_cast<int>(population.size() / 2)}))};
 
     const auto second_parent_itr {
-      std::prev(population.end(),
+      std::prev(population.end(), // O(population_size + children_per_itr)
                 dist(rand_src,
                      std::uniform_int_distribution<>::param_type {
                        1,
@@ -304,11 +310,13 @@ static void reproduce(const tsp::Matrix<int>& matrix,
     }
   }
 
-  for (auto& child : children) {
+  for (auto& child : children) { // O(children_per_itr * log(population_size + children_per_itr))
     population.emplace(std::move(child));
   }
 }
 
+// O(n^2 + logn * population_count + itr_count * (children_per_itr^2 + children_per_itr * (log(population_size + children_per_itr) + population_size) + mutations_per_1000 * (population_size + children_per_itr)))
+// mem O(n^2 + n + children_per_itr)
 [[nodiscard]] static std::variant<tsp::Solution, tsp::ErrorAlgorithm> algorithm(
 const tsp::Matrix<int>&   matrix,
 const tsp::GraphInfo&     graph_info,
@@ -321,7 +329,7 @@ int                       max_v_count_crossover,
 int                       mutations_per_1000) noexcept {
   std::mt19937_64 rand_src {std::random_device {}()};
 
-  auto population_result {init_population(matrix,
+  auto population_result {init_population(matrix, // O(n^2 + population_count * logn), mem O(n^2 + n)
                                           graph_info,
                                           optimal_cost,
                                           rand_src,
@@ -342,7 +350,7 @@ int                       mutations_per_1000) noexcept {
       break;
     }
 
-    reproduce(matrix,
+    reproduce(matrix, // O(children_per_itr^2 + children_per_itr * (log(population_size + children_per_itr) + population_size)), mem O(children_per_itr)
               rand_src,
               population,
               children_per_itr,
@@ -350,7 +358,7 @@ int                       mutations_per_1000) noexcept {
               max_v_count_crossover);
 
     // mutate based on mutation chance, the base is chosen on geometric distribution basis, if mutation is successful add to population
-    for (int mutation_chance {0}; mutation_chance < 1000; ++mutation_chance) {
+    for (int mutation_chance {0}; mutation_chance < 1000; ++mutation_chance) { // O(mutations_per_1000 * (population_size + children_per_itr))
       if (mutation_dist(rand_src) < mutations_per_1000) [[unlikely]] {
         const int to_mutate {std::min(static_cast<int>(population.size() - 1),
                                       mutated_dist(rand_src))};
@@ -365,7 +373,7 @@ int                       mutations_per_1000) noexcept {
       }
     }
 
-    cut(population, population_size);
+    cut(population, population_size); // O(population_size + children_per_itr)
   }
 
   return tsp::Solution {.path = population.begin()->path,
