@@ -29,15 +29,11 @@
 #pragma comment(lib, "Kernel32.lib")
 
 int main(int argc, const char** argv) {
-  // const auto arg_result {util::arg::read(argc, argv)};
-  // if (util::error::handle(arg_result) == tsp::State::ERROR) {
-  //   return EXIT_FAILURE;
-  // }
-  // const tsp::Arguments arg {std::get<tsp::Arguments>(arg_result)};
-  const tsp::Arguments arg {tsp::SingleRun {
-    .algorithm = tsp::Algorithm::GENETIC,
-    .config_file = "../../../data/tsplib_tsp/configs/127_bier127.ini",
-  }};
+  const auto arg_result {util::arg::read(argc, argv)};
+  if (util::error::handle(arg_result) == tsp::State::ERROR) {
+    return EXIT_FAILURE;
+  }
+  const tsp::Arguments arg {std::get<tsp::Arguments>(arg_result)};
 
   // set priority for process and thread for more consistent results.
   if (SetPriorityClass(GetCurrentProcess(), HIGH_PRIORITY_CLASS) == 0 ||
