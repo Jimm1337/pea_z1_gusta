@@ -44,8 +44,8 @@ struct Chromosome {
 // population is always sorted by cost
 using Population = std::set<Chromosome>;
 
-// O(n^2 + population_count * logn) >> nn + init_population -> O(n^2 + population_count * logn)
-// memory -> O(n^2 + n) >> nn + population -> O(n^2 + n)
+// O(n^2 + population_count * log(population_count)) >> nn + init_population -> O(n^2 + population_count * log(population_count))
+// memory -> O(n^2 + population_count) >> nn + population -> O(n^2 + population_count)
 [[nodiscard]] static std::variant<Population, tsp::ErrorAlgorithm>
 init_population(const tsp::Matrix<int>&   matrix,
                 const tsp::GraphInfo&     graph_info,
@@ -114,7 +114,7 @@ init_population(const tsp::Matrix<int>&   matrix,
                         &first_idx,
                         &second_v,
                         &second_idx,
-                        &cost_diff]() noexcept { //O(log(n)) - insert
+                        &cost_diff]() noexcept { //O(log(population_count)) - insert
       Chromosome chromosome {.vertices = nn_chromosome.vertices,
                              .path     = nn_chromosome.path,
                              .cost     = nn_chromosome.cost + cost_diff};
@@ -315,8 +315,8 @@ static void reproduce(const tsp::Matrix<int>& matrix,
   }
 }
 
-// O(n^2 + logn * population_count + itr_count * (children_per_itr^2 + children_per_itr * (log(population_size + children_per_itr) + population_size) + mutations_per_1000 * (population_size + children_per_itr)))
-// mem O(n^2 + n + children_per_itr)
+// O(n^2 + logpop_size * population_count + itr_count * (children_per_itr^2 + children_per_itr * (log(population_size + children_per_itr) + population_size) + mutations_per_1000 * (population_size + children_per_itr)))
+// mem O(population_size * n + children_per_itr * n)
 [[nodiscard]] static std::variant<tsp::Solution, tsp::ErrorAlgorithm> algorithm(
 const tsp::Matrix<int>&   matrix,
 const tsp::GraphInfo&     graph_info,
@@ -329,7 +329,7 @@ int                       max_v_count_crossover,
 int                       mutations_per_1000) noexcept {
   std::mt19937_64 rand_src {std::random_device {}()};
 
-  auto population_result {init_population(matrix, // O(n^2 + population_count * logn), mem O(n^2 + n)
+  auto population_result {init_population(matrix, // O(n^2 + population_count * logpop_size), mem O(population_size * n)
                                           graph_info,
                                           optimal_cost,
                                           rand_src,
@@ -341,7 +341,7 @@ int                       mutations_per_1000) noexcept {
 
   Population population {std::move(std::get<Population>(population_result))};
 
-  std::uniform_int_distribution mutation_dist {0, 1000};
+  std::uniform_int_distribution mutation_dist {0, 1};
   std::geometric_distribution   mutated_dist {0.5};
 
   for (int itr {0}; itr < count_of_itr; ++itr) {
@@ -358,8 +358,8 @@ int                       mutations_per_1000) noexcept {
               max_v_count_crossover);
 
     // mutate based on mutation chance, the base is chosen on geometric distribution basis, if mutation is successful add to population
-    for (int mutation_chance {0}; mutation_chance < 1000; ++mutation_chance) { // O(mutations_per_1000 * (population_size + children_per_itr))
-      if (mutation_dist(rand_src) < mutations_per_1000) [[unlikely]] {
+    for (int mutation_chance {0}; mutation_chance < mutations_per_1000; ++mutation_chance) { // O(mutations_per_1000 * (population_size + children_per_itr + log(population_size + children_per_itr)))
+      if (mutation_dist(rand_src) == 0) {
         const int to_mutate {std::min(static_cast<int>(population.size() - 1),
                                       mutated_dist(rand_src))};
         if (auto mutated {mutate(matrix,
